@@ -11,7 +11,7 @@ XPERT_PASSWORD = os.environ.get("XPERT_PASSWORD")
 GROUPME_BOT_ID = os.environ.get("GROUPME_BOT_ID")
 
 LOGIN_URL = "https://www.xperteleven.com/login.aspx"
-MATCH_URL_TEMPLATE = "https://www.xperteleven.com/match.aspx?matchid={match_id}"  # you will update match_id dynamically
+MATCH_URL_TEMPLATE = "https://www.xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"  # you will update match_id dynamically
 
 session = requests.Session()
 
