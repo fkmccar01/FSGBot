@@ -33,14 +33,27 @@ def scrape_match_summary():
         print(response.text[:2000])
         print("=== END LOGIN HTML ===")
 
+       # Check if login succeeded
         if "Logout" not in response.text:
+            print("⚠️ Login failed. Response didn't include 'Logout'.")
             return "[Login to Xpert Eleven failed.]"
 
         # Fetch match page
         match_response = session.get(matches_url)
         html = match_response.text
-        print("=== First 1000 chars of match page ===")
-        print(html[:1000])
+    
+        # Save for debugging
+        print("=== Match Page HTML (first 1500 chars) ===")
+        print(html[:1500])
+
+        # Parse
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Look for event table
+        event_table = soup.find("table", {"class": "eventlist"})
+        if not event_table:
+            print("❌ Could not find 'eventlist' table in match page.")
+            return "[No match events were found. Maybe the page layout changed.]"
 
         # Parse the HTML
         soup = BeautifulSoup(html, "html.parser")
