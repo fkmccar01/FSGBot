@@ -3,61 +3,42 @@
 from flask import Flask, request
 import requests
 from bs4 import BeautifulSoup
-import os
 
-app = Flask(__name__)
-
-# ENV VARS
-X11_USERNAME = os.environ.get("X11_USERNAME")
-X11_PASSWORD = os.environ.get("X11_PASSWORD")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GROUPME_BOT_ID = os.environ.get("GROUPME_BOT_ID")
-
-# URLs
-LOGIN_URL = "https://www.xperteleven.com/front_new3.aspx"
-MATCH_URL = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"  # Replace with your own
-
-def ask_gemini(text):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY
-    }
+def login(session):
+    # GET login page to retrieve hidden form fields
+    response = session.get(LOGIN_URL)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    viewstate = soup.find('input', {'id': '__VIEWSTATE'})['value']
+    viewstategenerator = soup.find('input', {'id': '__VIEWSTATEGENERATOR'})['value']
+    eventvalidation = soup.find('input', {'id': '__EVENTVALIDATION'})['value']
+    
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": f"You are a studio analyst for FoxSportsGoon. Summarize this football match as exciting highlights:\n{text}"
-            }]
-        }]
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEGENERATOR": viewstategenerator,
+        "__EVENTVALIDATION": eventvalidation,
+        "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+        "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+        "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
     }
+    
+    login_response = session.post(LOGIN_URL, data=payload)
+    return login_response
 
-    res = requests.post(url, json=payload, headers=headers)
-    try:
-        return res.json()['candidates'][0]['content']['parts'][0]['text']
-    except:
-        return "[Gemini response error]"
-
-def scrape_match_summary():
+@app.route('/scrape')
+def scrape():
     with requests.Session() as session:
-        # Log in
-        payload = {
-            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
-            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
-            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
-        }
-
-        response = session.post(LOGIN_URL, data=payload)
-
-        if "logout" not in response.text.lower():
-            return "Login to Xpert Eleven failed."
-
-        # Scrape match
+        login_response = login(session)
+        
+        if "logout" not in login_response.text.lower():
+            return "Login failed. Check credentials."
+        
         match_page = session.get(MATCH_URL)
         soup = BeautifulSoup(match_page.text, 'html.parser')
-
+        
         events = soup.find_all("tr", class_="ItemStyle2")
         summary = []
-
+        
         for event in events:
             try:
                 minute = event.find("span", class_="brotext10").text.strip()
@@ -66,7 +47,7 @@ def scrape_match_summary():
                     summary.append(f"{minute}': {desc.text.strip()}")
             except:
                 continue
-
+        
         match_text = "\n".join(summary)
         return ask_gemini(match_text)
 
