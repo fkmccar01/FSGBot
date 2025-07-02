@@ -14,7 +14,7 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 def scrape_match_summary():
-    login_url = "https://www.xperteleven.com/"
+    login_url = "https://www.xperteleven.com/?p=login"
     matches_url = "https://www.xperteleven.com/match.aspx?Lid=180838&Lmid=832343248"
 
     with requests.Session() as session:
