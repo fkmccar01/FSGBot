@@ -15,7 +15,7 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini
 
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/?p=login"
-    matches_url = "https://www.xperteleven.com/match.aspx?Lid=180838&Lmid=832343248"
+    matches_url = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
     with requests.Session() as session:
         # Login payload
