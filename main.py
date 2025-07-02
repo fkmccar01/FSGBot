@@ -98,20 +98,22 @@ def index():
 @app.route("/webhook", methods=["POST"])
 def groupme_webhook():
     data = request.get_json()
+    print("Webhook data received:", data)  # Log incoming request
+
     if not data:
         return "No data received", 400
 
     text = data.get("text", "")
     sender_type = data.get("sender_type", "")
-    name = data.get("name", "")
 
     if sender_type == "bot":
         return "Ignoring my own message"
 
     if "FSGBot tell me about the last match" in text:
         match_info = scrape_match_summary()
-        print("Scraped match summary:\n", match_info)
+        print("Scraper output:\n", match_info)  # Log scraper output
         response = generate_gemini_summary(match_info)
+        print("Gemini summary:\n", response)  # Log Gemini API response
         send_groupme_message(response)
 
     return "ok", 200
