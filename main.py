@@ -2,7 +2,7 @@ from flask import Flask, request
 import os
 import requests
 from bs4 import BeautifulSoup
-import re
+import sys
 
 app = Flask(__name__)
 
@@ -15,23 +15,20 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini
 
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_url = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
+    matches_url = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
     with requests.Session() as session:
-        # Step 1: Load login page and extract hidden fields
-        login_page = session.get(login_url)
-        soup = BeautifulSoup(login_page.text, "html.parser")
+        # First, get the login page to extract hidden fields (VIEWSTATE etc)
+        initial_response = session.get(login_url)
+        soup_initial = BeautifulSoup(initial_response.text, "html.parser")
+        
+        # Extract hidden form fields required for login
+        viewstate = soup_initial.find("input", {"id": "__VIEWSTATE"})["value"]
+        viewstategen = soup_initial.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+        eventvalidation = soup_initial.find("input", {"id": "__EVENTVALIDATION"})["value"]
 
-        try:
-            viewstate = soup.find("input", {"name": "__VIEWSTATE"})["value"]
-            viewstategen = soup.find("input", {"name": "__VIEWSTATEGENERATOR"})["value"]
-            eventvalidation = soup.find("input", {"name": "__EVENTVALIDATION"})["value"]
-        except Exception as e:
-            print("❌ Failed to extract hidden fields:", e)
-            return "[Login page missing required fields.]"
-
-        # Step 2: Build form payload
-        payload = {
+        # Prepare login payload with hidden fields + your credentials
+        login_payload = {
             "__VIEWSTATE": viewstate,
             "__VIEWSTATEGENERATOR": viewstategen,
             "__EVENTVALIDATION": eventvalidation,
@@ -40,30 +37,43 @@ def scrape_match_summary():
             "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
         }
 
-        # Step 3: Submit login form
-        response = session.post(login_url, data=payload)
+        # Perform login POST
+        response = session.post(login_url, data=login_payload)
 
-        print("=== LOGIN RESPONSE ===")
-        print(response.text[:2000])
-        print("======================")
+        # Write login response HTML to file for debugging
+        with open("login_debug.html", "w", encoding="utf-8") as f:
+            f.write(response.text)
+        sys.stderr.write("✅ Saved login_debug.html\n")
 
+        # Log first 2000 chars of login response
+        sys.stderr.write("=== LOGIN HTML (first 2000 chars) ===\n")
+        sys.stderr.write(response.text[:2000] + "\n")
+        sys.stderr.write("=== END LOGIN HTML ===\n")
+
+        # Check if login succeeded by looking for "Logout" in response
         if "Logout" not in response.text:
-            print("⚠️ Login failed: 'Logout' not in page.")
+            sys.stderr.write("⚠️ Login failed. Response didn't include 'Logout'.\n")
             return "[Login to Xpert Eleven failed.]"
 
-        # Step 4: Fetch match page
-        match_page = session.get(match_url)
-        html = match_page.text
-        print("=== MATCH PAGE ===")
-        print(html[:1500])
+        # Fetch match page after login
+        match_response = session.get(matches_url)
+        html = match_response.text
 
+        # Log first 1500 chars of match page
+        sys.stderr.write("=== Match Page HTML (first 1500 chars) ===\n")
+        sys.stderr.write(html[:1500] + "\n")
+
+        # Parse the match events table
         soup = BeautifulSoup(html, "html.parser")
         event_table = soup.find("table", {"class": "eventlist"})
+
         if not event_table:
+            sys.stderr.write("❌ Could not find 'eventlist' table in match page.\n")
             return "[No match events were found. Maybe the page layout changed.]"
 
+        rows = event_table.find_all("tr")
         summary_lines = []
-        for row in event_table.find_all("tr"):
+        for row in rows:
             cells = row.find_all("td")
             if len(cells) >= 3:
                 minute = cells[0].get_text(strip=True)
@@ -96,7 +106,7 @@ def index():
 @app.route("/webhook", methods=["POST"])
 def groupme_webhook():
     data = request.get_json()
-    print("Webhook data received:", data)  # Log incoming request
+    sys.stderr.write(f"Webhook data received: {data}\n")  # Log incoming request
 
     if not data:
         return "No data received", 400
@@ -109,7 +119,7 @@ def groupme_webhook():
 
     if "FSGBot tell me about the last match" in text:
         match_info = scrape_match_summary()
-        print("Scraper output:\n", match_info)  # Log scraper output
+        sys.stderr.write(f"Scraper output:\n{match_info}\n")
 
         failure_phrases = [
             "failed",
@@ -124,11 +134,11 @@ def groupme_webhook():
                 "with our Xpert Eleven feed, so no detailed match summary is available at the moment. "
                 "Stay tuned to FoxSportsGoon for updates!"
             )
-            print("Sending fallback message due to scraping failure.")
+            sys.stderr.write("Sending fallback message due to scraping failure.\n")
             send_groupme_message(fallback_message)
         else:
             response = generate_gemini_summary(match_info)
-            print("Gemini summary:\n", response)
+            sys.stderr.write(f"Gemini summary:\n{response}\n")
             send_groupme_message(response)
 
     return "ok", 200
