@@ -33,8 +33,8 @@ def scrape_match_summary():
         print(response.text[:2000])
         print("=== END LOGIN HTML ===")
 
-if "Logout" not in response.text:
-    return "[Login to Xpert Eleven failed.]"
+        if "Logout" not in response.text:
+        return "[Login to Xpert Eleven failed.]"
 
         # Fetch match page
         match_response = session.get(matches_url)
