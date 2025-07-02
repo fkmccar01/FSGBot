@@ -112,9 +112,27 @@ def groupme_webhook():
     if "FSGBot tell me about the last match" in text:
         match_info = scrape_match_summary()
         print("Scraper output:\n", match_info)  # Log scraper output
-        response = generate_gemini_summary(match_info)
-        print("Gemini summary:\n", response)  # Log Gemini API response
-        send_groupme_message(response)
+
+        # Check if scraping failed by looking for failure keywords
+        failure_phrases = [
+            "failed", 
+            "no match", 
+            "no events", 
+            "login to xpert eleven failed",
+            "no events to summarize"
+        ]
+        if any(phrase in match_info.lower() for phrase in failure_phrases):
+            fallback_message = (
+                "Alright folks, we're experiencing some technical difficulties "
+                "with our Xpert Eleven feed, so no detailed match summary is available at the moment. "
+                "Stay tuned to FoxSportsGoon for updates!"
+            )
+            print("Sending fallback message due to scraping failure.")
+            send_groupme_message(fallback_message)
+        else:
+            response = generate_gemini_summary(match_info)
+            print("Gemini summary:\n", response)  # Log Gemini API response
+            send_groupme_message(response)
 
     return "ok", 200
 
