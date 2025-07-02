@@ -80,7 +80,7 @@ def send_groupme_message(message):
 def home():
     return "FSGBot is running."
 
-@app.route('/groupme', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def groupme_webhook():
     data = request.get_json()
 
