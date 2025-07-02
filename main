@@ -1,1 +1,41 @@
+import requests
+from bs4 import BeautifulSoup
+
+# Replace with your actual login credentials
+USERNAME = "your_username"
+PASSWORD = "your_password"
+
+# Create a session to persist cookies
+session = requests.Session()
+
+# The login URL
+login_url = "https://www.xperteleven.com/front_new3.aspx"
+
+# Step 1: Load the login page first to get VIEWSTATE
+resp = session.get(login_url)
+soup = BeautifulSoup(resp.text, "html.parser")
+
+# Extract hidden input fields needed for login
+viewstate = soup.find("input", {"id": "__VIEWSTATE"})["value"]
+event_validation = soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
+viewstate_gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+
+# Step 2: Prepare the login data
+login_data = {
+    "__VIEWSTATE": viewstate,
+    "__EVENTVALIDATION": event_validation,
+    "__VIEWSTATEGENERATOR": viewstate_gen,
+    "ctl00$cphMain$FrontControl$lwLogin$tbUsername": itzaroni,
+    "ctl00$cphMain$FrontControl$lwLogin$tbPassword": itzaroni09,
+    "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login",
+}
+
+# Step 3: Post the login form
+response = session.post(login_url, data=login_data)
+
+# Check if login succeeded by looking for your username in the page
+if USERNAME in response.text:
+    print("✅ Logged in successfully!")
+else:
+    print("❌ Login failed.")
 
