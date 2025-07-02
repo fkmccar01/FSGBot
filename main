@@ -1,41 +1,47 @@
+from flask import Flask, request
 import requests
 from bs4 import BeautifulSoup
+import os
 
-# Replace with your actual login credentials
-USERNAME = "your_username"
-PASSWORD = "your_password"
+app = Flask(__name__)
 
-# Create a session to persist cookies
-session = requests.Session()
+X11_USERNAME = os.environ.get("itzaroni")
+X11_PASSWORD = os.environ.get("itzaroni09")
 
-# The login URL
-login_url = "https://www.xperteleven.com/front_new3.aspx"
+LOGIN_URL = "https://www.xperteleven.com/front_new3.aspx"
+MATCH_URL = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
-# Step 1: Load the login page first to get VIEWSTATE
-resp = session.get(login_url)
-soup = BeautifulSoup(resp.text, "html.parser")
+@app.route('/')
+def home():
+    return "X11 Scraper Bot is running."
 
-# Extract hidden input fields needed for login
-viewstate = soup.find("input", {"id": "__VIEWSTATE"})["value"]
-event_validation = soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
-viewstate_gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+@app.route('/scrape', methods=['GET'])
+def scrape_match():
+    with requests.Session() as session:
+        login_payload = {
+            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
+        }
 
-# Step 2: Prepare the login data
-login_data = {
-    "__VIEWSTATE": viewstate,
-    "__EVENTVALIDATION": event_validation,
-    "__VIEWSTATEGENERATOR": viewstate_gen,
-    "ctl00$cphMain$FrontControl$lwLogin$tbUsername": itzaroni,
-    "ctl00$cphMain$FrontControl$lwLogin$tbPassword": itzaroni09,
-    "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login",
-}
+        response = session.post(LOGIN_URL, data=login_payload)
+        
+        if "logout" not in response.text.lower():
+            return "Login failed."
 
-# Step 3: Post the login form
-response = session.post(login_url, data=login_data)
+        match_page = session.get(MATCH_URL)
+        soup = BeautifulSoup(match_page.text, 'html.parser')
 
-# Check if login succeeded by looking for your username in the page
-if USERNAME in response.text:
-    print("✅ Logged in successfully!")
-else:
-    print("❌ Login failed.")
+        events = soup.find_all("tr", class_="ItemStyle2")
+        summary = []
 
+        for event in events:
+            minute = event.find("span", class_="brotext10").text.strip()
+            desc = event.find("span", {"id": lambda x: x and "lblEventDesc" in x})
+            if desc:
+                summary.append(f"{minute}': {desc.text.strip()}")
+
+        return "<br>".join(summary)
+
+if __name__ == '__main__':
+    app.run(debug=True)
