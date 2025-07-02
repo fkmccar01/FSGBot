@@ -7,12 +7,15 @@ import os
 
 app = Flask(__name__)
 
+# ENV VARS
 X11_USERNAME = os.environ.get("X11_USERNAME")
 X11_PASSWORD = os.environ.get("X11_PASSWORD")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROUPME_BOT_ID = os.environ.get("GROUPME_BOT_ID")
 
+# URLs
 LOGIN_URL = "https://www.xperteleven.com/front_new3.aspx"
-MATCH_URL = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"  # Replace with actual match URL
+MATCH_URL = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"  # Replace with your own
 
 def ask_gemini(text):
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
@@ -23,7 +26,7 @@ def ask_gemini(text):
     payload = {
         "contents": [{
             "parts": [{
-                "text": f"You are a studio analyst for soccer channel FoxSportsGoon. Summarize this football match as if you are giving viewers the exciting highlights of the match:\n{text}"
+                "text": f"You are a studio analyst for FoxSportsGoon. Summarize this football match as exciting highlights:\n{text}"
             }]
         }]
     }
@@ -34,13 +37,9 @@ def ask_gemini(text):
     except:
         return "[Gemini response error]"
 
-@app.route('/')
-def home():
-    return "X11 Scraper Bot is running."
-
-@app.route('/scrape')
-def scrape():
+def scrape_match_summary():
     with requests.Session() as session:
+        # Log in
         payload = {
             "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
             "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
@@ -50,8 +49,9 @@ def scrape():
         response = session.post(LOGIN_URL, data=payload)
 
         if "logout" not in response.text.lower():
-            return "Login failed. Check credentials."
+            return "Login to Xpert Eleven failed."
 
+        # Scrape match
         match_page = session.get(MATCH_URL)
         soup = BeautifulSoup(match_page.text, 'html.parser')
 
@@ -69,6 +69,32 @@ def scrape():
 
         match_text = "\n".join(summary)
         return ask_gemini(match_text)
+
+def send_groupme_message(message):
+    requests.post("https://api.groupme.com/v3/bots/post", json={
+        "bot_id": GROUPME_BOT_ID,
+        "text": message
+    })
+
+@app.route('/')
+def home():
+    return "FSGBot is running."
+
+@app.route('/groupme', methods=['POST'])
+def groupme_webhook():
+    data = request.get_json()
+
+    # Ignore bot's own messages
+    if data['sender_type'] == "bot":
+        return "ok", 200
+
+    message_text = data.get("text", "").lower()
+
+    if "fsgbot" in message_text and "last match" in message_text:
+        summary = scrape_match_summary()
+        send_groupme_message(summary)
+
+    return "ok", 200
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=10000)
