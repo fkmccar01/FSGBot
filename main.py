@@ -3,6 +3,9 @@
 from flask import Flask, request
 import requests
 from bs4 import BeautifulSoup
+import os
+
+app = Flask(__name__)
 
 def login(session):
     # GET login page to retrieve hidden form fields
