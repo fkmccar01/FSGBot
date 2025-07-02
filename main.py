@@ -15,57 +15,55 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini
 
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    matches_url = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
+    match_url = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
     with requests.Session() as session:
-        # Login payload
-        login_payload = {
-            "username": X11_USERNAME,
-            "password": X11_PASSWORD,
-            "Login": "Login"
+        # Step 1: Load login page and extract hidden fields
+        login_page = session.get(login_url)
+        soup = BeautifulSoup(login_page.text, "html.parser")
+
+        try:
+            viewstate = soup.find("input", {"name": "__VIEWSTATE"})["value"]
+            viewstategen = soup.find("input", {"name": "__VIEWSTATEGENERATOR"})["value"]
+            eventvalidation = soup.find("input", {"name": "__EVENTVALIDATION"})["value"]
+        except Exception as e:
+            print("❌ Failed to extract hidden fields:", e)
+            return "[Login page missing required fields.]"
+
+        # Step 2: Build form payload
+        payload = {
+            "__VIEWSTATE": viewstate,
+            "__VIEWSTATEGENERATOR": viewstategen,
+            "__EVENTVALIDATION": eventvalidation,
+            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
         }
 
-       # Perform login
-        response = session.post(login_url, data=login_payload)
+        # Step 3: Submit login form
+        response = session.post(login_url, data=payload)
 
-        # DEBUG: print login response to check if login worked
-        print("=== LOGIN HTML (first 2000 chars) ===")
+        print("=== LOGIN RESPONSE ===")
         print(response.text[:2000])
-        print("=== END LOGIN HTML ===")
+        print("======================")
 
-       # Check if login succeeded
         if "Logout" not in response.text:
-            print("⚠️ Login failed. Response didn't include 'Logout'.")
+            print("⚠️ Login failed: 'Logout' not in page.")
             return "[Login to Xpert Eleven failed.]"
 
-        # Fetch match page
-        match_response = session.get(matches_url)
-        html = match_response.text
-    
-        # Save for debugging
-        print("=== Match Page HTML (first 1500 chars) ===")
+        # Step 4: Fetch match page
+        match_page = session.get(match_url)
+        html = match_page.text
+        print("=== MATCH PAGE ===")
         print(html[:1500])
 
-        # Parse
         soup = BeautifulSoup(html, "html.parser")
-
-        # Look for event table
-        event_table = soup.find("table", {"class": "eventlist"})
-        if not event_table:
-            print("❌ Could not find 'eventlist' table in match page.")
-            return "[No match events were found. Maybe the page layout changed.]"
-
-        # Parse the HTML
-        soup = BeautifulSoup(html, "html.parser")
-
-        # Try to locate event list
         event_table = soup.find("table", {"class": "eventlist"})
         if not event_table:
             return "[No match events were found. Maybe the page layout changed.]"
 
-        rows = event_table.find_all("tr")
         summary_lines = []
-        for row in rows:
+        for row in event_table.find_all("tr"):
             cells = row.find_all("td")
             if len(cells) >= 3:
                 minute = cells[0].get_text(strip=True)
@@ -113,11 +111,10 @@ def groupme_webhook():
         match_info = scrape_match_summary()
         print("Scraper output:\n", match_info)  # Log scraper output
 
-        # Check if scraping failed by looking for failure keywords
         failure_phrases = [
-            "failed", 
-            "no match", 
-            "no events", 
+            "failed",
+            "no match",
+            "no events",
             "login to xpert eleven failed",
             "no events to summarize"
         ]
@@ -131,7 +128,7 @@ def groupme_webhook():
             send_groupme_message(fallback_message)
         else:
             response = generate_gemini_summary(match_info)
-            print("Gemini summary:\n", response)  # Log Gemini API response
+            print("Gemini summary:\n", response)
             send_groupme_message(response)
 
     return "ok", 200
