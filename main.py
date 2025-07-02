@@ -15,7 +15,7 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini
 
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    matches_url = "https://xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
+    matches_url = "https://www.xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
     with requests.Session() as session:
         # First, get the login page to extract hidden fields (VIEWSTATE etc)
