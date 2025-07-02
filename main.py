@@ -25,10 +25,16 @@ def scrape_match_summary():
             "Login": "Login"
         }
 
-        # Perform login
+       # Perform login
         response = session.post(login_url, data=login_payload)
-        if "Logout" not in response.text:
-            return "[Login to Xpert Eleven failed.]"
+
+        # DEBUG: print login response to check if login worked
+        print("=== LOGIN HTML (first 2000 chars) ===")
+        print(response.text[:2000])
+        print("=== END LOGIN HTML ===")
+
+if "Logout" not in response.text:
+    return "[Login to Xpert Eleven failed.]"
 
         # Fetch match page
         match_response = session.get(matches_url)
