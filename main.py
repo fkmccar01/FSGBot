@@ -59,7 +59,7 @@ def scrape_match_summary():
 def generate_gemini_summary(match_data):
     headers = {"Content-Type": "application/json"}
     params = {"key": GEMINI_API_KEY}
-    prompt = f"Write a sarcastic sports recap based on this match summary:\n\n{match_data}"
+    prompt = f"You are a studio analyst for soccer channel FoxSportsGoon. Summarize this soccer match like you are reporting the highlights to viewers:\n\n{match_data}"
     payload = {
         "contents": [
             {"parts": [{"text": prompt}]}
