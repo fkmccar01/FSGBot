@@ -212,10 +212,15 @@ def annotate_players_in_text(summary, player_grades):
 
 def remove_gemini_grades(summary, player_grades):
     for player in player_grades:
-        name = player["name"]
-        # Match either: Name (Grade: X) OR Name Grade: X
-        pattern = rf"{re.escape(name)}\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)"
-        summary = re.sub(pattern, name, summary, flags=re.IGNORECASE)
+        name = re.escape(player["name"])
+
+        # Remove Gemini-inserted grade phrases like:
+        # "Name (Grade: 21)", "Name Grade: 21", "Name (rating 21)", etc.
+        summary = re.sub(rf"{name}\s*\((Grade|grade|rating)\s*:\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*(Grade|grade)\s*:\s*\d+", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*\(rating\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*rating\s*\d+", player["name"], summary, flags=re.IGNORECASE)
+
     return summary
 
 def scrape_and_summarize():
