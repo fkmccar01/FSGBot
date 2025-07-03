@@ -152,6 +152,33 @@ def call_gemini_api(prompt):
 
 import re
 
+def annotate_once_only(text, player_grades):
+    annotated = set()
+    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+
+    for player in sorted_players:
+        name = player["name"]
+        pos = player["position"]
+        grade = player["grade"]
+        if not grade:
+            continue
+
+        # Match name with or without a previous annotation in parentheses
+        pattern = rf'\b{re.escape(name)}\b(?:\s*\(.*?\))?'
+
+        def replacer(match):
+            matched_text = match.group(0)
+            if name.lower() in annotated:
+                return name  # plain name after first mention
+            annotated.add(name.lower())
+            return f"{name} ({pos}, {grade} 📊)"
+
+        text = re.sub(pattern, replacer, text, flags=re.IGNORECASE)
+
+    return text
+
+import re
+
 def parse_player_grades(soup):
     players = []
 
@@ -245,7 +272,8 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
-        return summary
+        clean_summary = annotate_once_only(summary, player_grades)
+        return clean_summary
 
 @app.route("/", methods=["GET"])
 def index():
