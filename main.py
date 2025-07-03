@@ -87,11 +87,28 @@ def format_gemini_prompt(match_data, events, player_grades):
     referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
-    ratings_lines = []
-    for p in player_grades:
-        line = f"{p['name']} ({p['position']}, {p['team']}) - Grade: {p['grade']}"
-        ratings_lines.append(line)
-    ratings_text = "Player Ratings:\n" + "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
+    def annotate(text, player_grades):
+        sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+        annotated = set()
+
+        for player in sorted_players:
+            name = player["name"]
+            pos = player["position"]
+            grade = player["grade"]
+            if not grade:
+                continue
+
+            # Annotate only the first occurrence
+            def replacer(match):
+                matched_name = match.group(0)
+                if matched_name.lower() not in annotated:
+                    annotated.add(matched_name.lower())
+                    return f"{matched_name} ({pos}, {grade} 📊)"
+                return matched_name
+
+            text = re.sub(rf'\b{re.escape(name)}\b', replacer, text, flags=re.IGNORECASE)
+
+        return text
 
     prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
@@ -182,26 +199,6 @@ def parse_player_grades(soup):
 
 import re
 
-def annotate_players_in_text(summary, player_grades):
-    # Sort players by name length descending to avoid partial overlaps
-    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
-    annotated_names = set()
-
-    def replace_first_mention(match):
-        name = match.group(0)
-        if name not in annotated_names:
-            annotated_names.add(name)
-            for player in sorted_players:
-                if player["name"] == name and player["grade"] is not None:
-                    return f"{name} ({player['position']}, {player['grade']} 📊)"
-        return name  # leave unannotated on later mentions
-
-    for player in sorted_players:
-        # Replace only whole word matches (e.g., "Smith" not part of "Smithson")
-        summary = re.sub(rf'\b{re.escape(player["name"])}\b', replace_first_mention, summary)
-
-    return summary
-
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
@@ -256,7 +253,6 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
-        summary = annotate_players_in_text(summary, player_grades)
         return summary
 
 @app.route("/", methods=["GET"])
