@@ -83,10 +83,6 @@ def parse_match_events(soup):
     return events
 
 def format_gemini_prompt(match_data, events, player_grades):
-    events_text = "\n".join(events)
-    referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
-    referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
-
     def annotate(text, player_grades):
         sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
         annotated = set()
@@ -98,7 +94,6 @@ def format_gemini_prompt(match_data, events, player_grades):
             if not grade:
                 continue
 
-            # Annotate only the first occurrence
             def replacer(match):
                 matched_name = match.group(0)
                 if matched_name.lower() not in annotated:
@@ -109,6 +104,13 @@ def format_gemini_prompt(match_data, events, player_grades):
             text = re.sub(rf'\b{re.escape(name)}\b', replacer, text, flags=re.IGNORECASE)
 
         return text
+
+    # 🧠 Annotate the match events before building prompt
+    annotated_events = [annotate(event, player_grades) for event in events]
+    events_text = "\n".join(annotated_events)
+
+    referee_events = [e for e in annotated_events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
+    referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
     prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
@@ -122,8 +124,6 @@ def format_gemini_prompt(match_data, events, player_grades):
         f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
     )
 
-    prompt = annotate(prompt, player_grades)
-    
     return prompt
 
 def call_gemini_api(prompt):
