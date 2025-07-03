@@ -123,9 +123,15 @@ def call_gemini_api(prompt):
 
     try:
         data = response.json()
-        # The generated text will be in data['contents'][0]['parts'][0]['text']
-        generated_text = data["contents"][0]["parts"][0]["text"]
-        return generated_text.strip()
+        sys.stderr.write(f"Gemini API response JSON: {json.dumps(data, indent=2)}\n")  # Log entire response for debugging
+
+        # Here you can try extracting your generated text, e.g.:
+        # generated_text = data["contents"][0]["parts"][0]["text"]
+        # return generated_text.strip()
+
+        # But for now just return placeholder so you can see logs:
+        return "[Check logs for full Gemini response.]"
+
     except Exception as e:
         sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
         return "[Failed to generate summary.]"
