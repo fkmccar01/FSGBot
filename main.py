@@ -1,3 +1,4 @@
+
 import os
 import sys
 import requests
@@ -81,6 +82,67 @@ def parse_match_events(soup):
         events.append(event_text)
     return events
 
+def format_gemini_prompt(match_data, events, player_grades):
+    events_text = "\n".join(events)
+    referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
+    referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
+
+    ratings_lines = []
+    for p in player_grades:
+        line = f"{p['name']} ({p['position']}, {p['team']}) - Grade: {p['grade']}"
+        ratings_lines.append(line)
+    ratings_text = "Player Ratings:\n" + "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
+
+    prompt = (
+        f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
+        f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
+        f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
+        f"Match Events:\n{events_text}\n\n"
+        f"Referee: {match_data['referee']}\n"
+        f"Referee-related events:\n{referee_events_text}\n\n"
+        f"{ratings_text}\n\n"
+        f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
+        f"Include who was the man of the match for the winning team.\n"
+        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
+    )
+    return prompt
+
+def call_gemini_api(prompt):
+    import json  # make sure this is imported at the top
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GEMINI_API_KEY,
+    }
+    body = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(GEMINI_API_URL, headers=headers, json=body)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Gemini API error {response.status_code}: {response.text}\n")
+        return "[Failed to generate summary.]"
+
+    try:
+        data = response.json()
+        sys.stderr.write(f"Gemini API response JSON:\n{json.dumps(data, indent=2)}\n")
+        
+        # ✅ Correct way to extract the summary
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    except Exception as e:
+        sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
+        return "[Failed to generate summary.]"
+
+import re
+
 def parse_player_grades(soup):
     players = []
 
@@ -118,50 +180,28 @@ def parse_player_grades(soup):
 
     return players
 
-def format_gemini_prompt(match_data, events, player_grades):
-    def annotate(text, player_grades):
-        sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
-        annotated = set()
+import re
 
-        for player in sorted_players:
-            name = player["name"]
-            pos = player["position"]
-            grade = player["grade"]
-            if not grade:
-                continue
+def annotate_players_in_text(summary, player_grades):
+    # Sort players by name length descending to avoid partial overlaps
+    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+    annotated_names = set()
 
-            # Annotate only the first occurrence
-            def replacer(match):
-                matched_name = match.group(0)
-                if matched_name.lower() not in annotated:
-                    annotated.add(matched_name.lower())
-                    return f"{matched_name} ({pos}, {grade} 📊)"
-                return matched_name
+    def replace_first_mention(match):
+        name = match.group(0)
+        if name not in annotated_names:
+            annotated_names.add(name)
+            for player in sorted_players:
+                if player["name"] == name and player["grade"] is not None:
+                    return f"{name} ({player['position']}, {player['grade']} 📊)"
+        return name  # leave unannotated on later mentions
 
-            text = re.sub(rf'\b{re.escape(name)}\b', replacer, text, flags=re.IGNORECASE)
+    for player in sorted_players:
+        # Replace only whole word matches (e.g., "Smith" not part of "Smithson")
+        summary = re.sub(rf'\b{re.escape(player["name"])}\b', replace_first_mention, summary)
 
-        return text
+    return summary
 
-    # Build the core prompt
-    prompt = f"""You are a witty and insightful football analyst summarizing the match between {match_data['home_team']} and {match_data['away_team']}. The game ended {match_data['home_score']} - {match_data['away_score']}.
-
-Venue: {match_data.get('venue', 'N/A')}
-Referee: {match_data.get('referee', 'N/A')}
-Man of the Match: {match_data['motm_home']} (home), {match_data['motm_away']} (away). Winner: {match_data['motm_winner']}
-
-Key Match Events:
-"""
-
-    for e in events:
-        prompt += f"\n- {e}"
-
-    prompt += "\n\nWrite an energetic and engaging match summary, focusing on key moments, player impact, drama, and fan excitement. Use vivid language and a fun tone. Include goal scorers, assists, and key performances.\n"
-
-    # Annotate player names directly in the prompt
-    prompt = annotate(prompt, player_grades)
-
-    return prompt
-    
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
@@ -196,7 +236,7 @@ def scrape_and_summarize():
 
         soup = BeautifulSoup(match_html, "html.parser")
         player_grades = parse_player_grades(soup)
-        match_data = parse_match_data(soup)
+        match_data = parse_match_data(soup)  # ✅ Use soup now
         events = parse_match_events(soup)
 
         motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
@@ -216,8 +256,8 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
-
-    return summary
+        summary = annotate_players_in_text(summary, player_grades)
+        return summary
 
 @app.route("/", methods=["GET"])
 def index():
