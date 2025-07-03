@@ -81,7 +81,7 @@ def parse_match_events(soup):
         events.append(event_text)
     return events
 
-def format_gemini_prompt(match_data, events):
+def format_gemini_prompt(match_data, events, player_grades):
     events_text = "\n".join(events)
     referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
