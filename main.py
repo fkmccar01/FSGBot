@@ -132,18 +132,18 @@ def format_gemini_prompt(match_data, events, player_grades):
 
     # Prompt Gemini with instruction to annotate the first mention only
     prompt = (
-        f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
-        f"Highlight outstanding player performances, describe all goals and assists, mention injuries, and include who was the man of the match.\n"
-        f"Keep it short, TV highlight-style, fun and energetic."
+        f"FSGBot is a charismatic, energetic TV analyst for FoxSportsGoon who delivers short, exciting football match recaps like a highlight commentator.\n"
+        f"He speaks with enthusiasm and natural flow, like he's narrating a sports highlight reel.\n\n"
+        f"Highlight key moments with dramatic flair (goals, assists, injuries, red card bookings), and keep it natural and entertaining.\n"
+        f"Refer to the timing of moments using phrases like 'in the 36th minute', 'just before halftime', 'early in the second half', etc.\n"
+        f"Only annotate players the first time they are mentioned using this format: Name (Position, Grade 📊).\n"
+        f"Don't repeat the annotations. Don't mention 'Grade:' or use rating scales like 8/10.\n\n"
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
         f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
         f"Match Events:\n{events_text}\n\n"
         f"Referee: {match_data['referee']}\n"
         f"Referee-related events:\n{referee_events_text}\n\n"
         f"Player Grades (use this info to annotate players the FIRST time they are mentioned only):\n{ratings_text}\n\n"
-        f"Use the exact format: Name (Position, Grade 📊), e.g. Roy Henderson (M, 21 📊).\n"
-        f"Do NOT repeat annotations after the first mention.\n\n"
-    
     )
 
     return prompt
