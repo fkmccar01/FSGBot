@@ -260,62 +260,6 @@ def get_latest_game_ids_from_league(url):
 
         return matches
 
-def scrape_and_summarize():
-    login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_id = "322737050"
-    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={match_id}&dh=2"
-
-    with requests.Session() as session:
-        login_page = session.get(login_url)
-        login_soup = BeautifulSoup(login_page.text, "html.parser")
-        try:
-            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
-            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
-            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
-        except Exception:
-            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
-            return "[Login form fields missing.]"
-
-        login_payload = {
-            "__VIEWSTATE": viewstate,
-            "__VIEWSTATEGENERATOR": viewstategen,
-            "__EVENTVALIDATION": eventvalidation,
-            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
-            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
-            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
-        }
-        login_response = session.post(login_url, data=login_payload)
-        if "Logout" not in login_response.text:
-            return "[Login to Xpert Eleven failed.]"
-
-        match_html = scrape_match_html(session, match_url)
-        if not match_html:
-            return "[Failed to retrieve match page.]"
-
-        soup = BeautifulSoup(match_html, "html.parser")
-        player_grades = parse_player_grades(soup)
-        match_data = parse_match_data(soup)  # ✅ Use soup now
-        events = parse_match_events(soup)
-
-        motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
-        motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
-        match_data["motm_home"] = motm_home.text.strip() if motm_home else "N/A"
-        match_data["motm_away"] = motm_away.text.strip() if motm_away else "N/A"
-
-        if match_data["home_score"].isdigit() and match_data["away_score"].isdigit():
-            if int(match_data["home_score"]) > int(match_data["away_score"]):
-                match_data["motm_winner"] = match_data["motm_home"]
-            elif int(match_data["away_score"]) > int(match_data["home_score"]):
-                match_data["motm_winner"] = match_data["motm_away"]
-            else:
-                match_data["motm_winner"] = "Match drawn, no MoTM winner"
-        else:
-            match_data["motm_winner"] = "N/A"
-
-        prompt = format_gemini_prompt(match_data, events, player_grades)
-        summary = call_gemini_api(prompt)
-        return summary
-
 def scrape_and_summarize_by_game_id(game_id):
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
@@ -391,29 +335,31 @@ def groupme_webhook():
     if sender_type == "bot":
         return "Ignoring bot message"
 
-    if "FSGBot tell me" in text:
-        sys.stderr.write("🔁 Received trigger phrase, generating last match summary\n")
-        summary = scrape_and_summarize()
-        send_groupme_message(summary)
-        return "ok", 200
-
     # Detect "highlights of the ___ match"
-    match = re.search(r"highlights of the (.+?) match", text, re.IGNORECASE)
-    if match:
-        team_name_query = normalize(match.group(1))
+    if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["highlight", "recap"]):
+    team_query = normalize(text)
 
-        # Check both leagues
-        for league_url in [GOONDESLIGA_URL, SPOONDESLIGA_URL]:
-            matches = get_latest_game_ids_from_league(league_url)
-            for m in matches:
-                if team_name_query in normalize(m["home_team"]) or team_name_query in normalize(m["away_team"]):
-                    summary = scrape_and_summarize_by_game_id(m["game_id"])
-                    send_groupme_message(summary)
-                    return "ok", 200
+    # List of league URLs to check
+    league_urls = [
+        os.environ.get("GOONDESLIGA_URL"),
+        os.environ.get("SPOONDESLIGA_URL")
+    ]
 
-        send_groupme_message(f"Sorry, I couldn’t find a recent match for '{team_name_query.title()}'.")
-        return "ok", 200
+    for league_url in league_urls:
+        if not league_url:
+            continue
 
+        matches = get_latest_game_ids_from_league(league_url)
+        for m in matches:
+            home_normal = normalize(m["home_team"])
+            away_normal = normalize(m["away_team"])
+
+            if home_normal in team_query or away_normal in team_query:
+                summary = scrape_and_summarize_by_game_id(m["game_id"])
+                send_groupme_message(summary)
+                return "ok", 200
+
+    send_groupme_message("Sorry, I couldn’t find a recent match for any team in your message.")
     return "ok", 200
 
 if __name__ == "__main__":
