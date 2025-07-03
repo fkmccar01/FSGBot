@@ -196,20 +196,24 @@ def annotate_players_in_text(summary, player_grades):
 
     for player in sorted_players:
         name = player["name"]
+        last_name = name.split()[-1]
         pos = player["position"]
         grade = player["grade"]
 
-        if not grade:
+        if grade is None or pos is None:
             continue
 
         def replacer(match):
             matched_name = match.group(0)
-            if name.lower() not in annotated:
-                annotated.add(name.lower())
+            key = matched_name.lower()
+            if key not in annotated:
+                annotated.add(key)
                 return f"{matched_name} ({pos}, {grade} 📊)"
             return matched_name
 
-        summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE)
+        for variant in [name, last_name]:
+            pattern = rf'(?<!\w)({re.escape(variant)})(?!\w)'
+            summary = re.sub(pattern, replacer, summary, flags=re.IGNORECASE)
 
     return summary
 
