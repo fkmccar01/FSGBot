@@ -3,6 +3,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import sys
+import json
 
 app = Flask(__name__)
 
@@ -13,18 +14,197 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-def scrape_match_summary():
+
+def scrape_match_html(session, url):
+    """Fetch the match page HTML."""
+    response = session.get(url)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Failed to get match page: {response.status_code}\n")
+        return None
+    return response.text
+
+
+def parse_match_data(html):
+    """Parse the match HTML and extract structured data."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # --- Teams and Score ---
+    try:
+        home_team = soup.find("a", id="ctl00_cphMain_hplHomeTeam").text.strip()
+        away_team = soup.find("a", id="ctl00_cphMain_hplAwayTeam").text.strip()
+        home_score = soup.find("span", id="ctl00_cphMain_lblHomeScore").text.strip()
+        away_score = soup.find("span", id="ctl00_cphMain_lblAwayScore").text.strip()
+        halftime_score = soup.find("span", id="ctl00_cphMain_lblHTScore").text.strip()
+    except Exception:
+        sys.stderr.write("⚠️ Failed to parse teams and score\n")
+        home_team = away_team = home_score = away_score = halftime_score = "N/A"
+
+    # --- Match Info ---
+    try:
+        round_info = soup.find("span", id="ctl00_cphMain_lblOmgang").text.strip()
+        league = soup.find("a", id="ctl00_cphMain_hplDivision").text.strip()
+        season = soup.find("span", id="ctl00_cphMain_lblSeason").text.strip()
+        venue = soup.find("span", id="ctl00_cphMain_lblArena").text.strip()
+        match_date = soup.find("span", id="ctl00_cphMain_lblMatchDate").text.strip()
+        referee = soup.find("span", id="ctl00_cphMain_lblReferee").text.strip()
+    except Exception:
+        sys.stderr.write("⚠️ Failed to parse match info\n")
+        round_info = league = season = venue = match_date = referee = "N/A"
+
+    # --- Parse lineups for both teams ---
+    def parse_lineup(table_id):
+        lineup = []
+        table = soup.find("table", id=table_id)
+        if not table:
+            return lineup
+        rows = table.find_all("tr")
+        for row in rows[1:]:  # skip header row
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                continue
+            position = cells[0].text.strip()
+            player_link = cells[1].find("a")
+            if player_link:
+                player_name = player_link.text.strip()
+                title = player_link.get("title", "")
+                # Extract player details from title text
+                grade = "N/A"
+                goal = assist = booked = injured = False
+                for line in title.split("\n"):
+                    line = line.strip()
+                    if line.startswith("Grade:"):
+                        grade = line.replace("Grade:", "").strip()
+                    if "Goal:" in line:
+                        goal = True
+                    if "Assist:" in line:
+                        assist = True
+                    if "Booked" in line:
+                        booked = True
+                    if "Injured" in line:
+                        injured = True
+                lineup.append({
+                    "position": position,
+                    "name": player_name,
+                    "grade": grade,
+                    "goal": goal,
+                    "assist": assist,
+                    "booked": booked,
+                    "injured": injured
+                })
+        return lineup
+
+    home_lineup = parse_lineup("ctl00_cphMain_dgHomeLineUp")
+    away_lineup = parse_lineup("ctl00_cphMain_dgAwayLineUp")
+
+    return {
+        "home_team": home_team,
+        "away_team": away_team,
+        "home_score": home_score,
+        "away_score": away_score,
+        "halftime_score": halftime_score,
+        "round_info": round_info,
+        "league": league,
+        "season": season,
+        "venue": venue,
+        "match_date": match_date,
+        "referee": referee,
+        "home_lineup": home_lineup,
+        "away_lineup": away_lineup,
+    }
+
+
+def format_gemini_prompt(match_data):
+    """Format a concise prompt to send to Gemini for an exciting summary."""
+    prompt = (
+        f"Write an exciting, brief summary of a soccer match with the following details:\n\n"
+        f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
+        f"Score: {match_data['home_score']} - {match_data['away_score']} (Halftime: {match_data['halftime_score']})\n"
+        f"Round: {match_data['round_info']}, League: {match_data['league']}, Season: {match_data['season']}\n"
+        f"Venue: {match_data['venue']}, Date: {match_data['match_date']}\n"
+        f"Referee: {match_data['referee']}\n\n"
+
+        f"Home Team Lineup:\n"
+    )
+    for player in match_data["home_lineup"]:
+        details = []
+        if player["goal"]:
+            details.append("Goal")
+        if player["assist"]:
+            details.append("Assist")
+        if player["booked"]:
+            details.append("Booked")
+        if player["injured"]:
+            details.append("Injured")
+        detail_str = f" ({', '.join(details)})" if details else ""
+        prompt += f"- {player['name']} [{player['position']}, Grade: {player['grade']}{detail_str}]\n"
+
+    prompt += "\nAway Team Lineup:\n"
+    for player in match_data["away_lineup"]:
+        details = []
+        if player["goal"]:
+            details.append("Goal")
+        if player["assist"]:
+            details.append("Assist")
+        if player["booked"]:
+            details.append("Booked")
+        if player["injured"]:
+            details.append("Injured")
+        detail_str = f" ({', '.join(details)})" if details else ""
+        prompt += f"- {player['name']} [{player['position']}, Grade: {player['grade']}{detail_str}]\n"
+
+    prompt += "\nSummarize the key events, highlight top performers, and make it exciting."
+    return prompt
+
+
+def call_gemini_api(prompt):
+    """Call Gemini API to generate a match summary."""
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GEMINI_API_KEY,
+    }
+    body = {
+        "prompt": {
+            "text": prompt
+        },
+        "temperature": 0.7,
+        "candidate_count": 1,
+        "max_output_tokens": 400,
+        "top_p": 0.95,
+        "top_k": 40,
+    }
+
+    response = requests.post(GEMINI_API_URL, headers=headers, json=body)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Gemini API error {response.status_code}: {response.text}\n")
+        return "[Failed to generate summary.]"
+
+    try:
+        data = response.json()
+        summary = data["candidates"][0]["output"]
+        return summary.strip()
+    except Exception as e:
+        sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
+        return "[Failed to generate summary.]"
+
+
+def scrape_and_summarize():
+    """Main function to login, scrape match, parse, generate summary."""
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    matches_url = "https://www.xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
+    match_id = "322737050"  # You can make this dynamic if needed
+    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={match_id}&dh=2"
 
     with requests.Session() as session:
         # Get login page to extract hidden fields
-        initial_response = session.get(login_url)
-        soup_initial = BeautifulSoup(initial_response.text, "html.parser")
+        login_page = session.get(login_url)
+        login_soup = BeautifulSoup(login_page.text, "html.parser")
 
-        viewstate = soup_initial.find("input", {"id": "__VIEWSTATE"})["value"]
-        viewstategen = soup_initial.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
-        eventvalidation = soup_initial.find("input", {"id": "__EVENTVALIDATION"})["value"]
+        try:
+            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
+            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
+        except Exception:
+            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
+            return "[Login form fields missing.]"
 
         login_payload = {
             "__VIEWSTATE": viewstate,
@@ -35,129 +215,18 @@ def scrape_match_summary():
             "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
         }
 
-        response = session.post(login_url, data=login_payload)
-
-        if "Logout" not in response.text:
-            sys.stderr.write("⚠️ Login failed. Response didn't include 'Logout'.\n")
+        login_response = session.post(login_url, data=login_payload)
+        if "Logout" not in login_response.text:
             return "[Login to Xpert Eleven failed.]"
 
-        # Fetch match page after login
-        match_response = session.get(matches_url)
-        html = match_response.text
+        match_html = scrape_match_html(session, match_url)
+        if not match_html:
+            return "[Failed to retrieve match page.]"
 
-        soup = BeautifulSoup(html, "html.parser")
-
-        # Get league info (round, league name)
-        round_info = soup.find("span", id="ctl00_cphMain_lblOmgang")
-        round_text = round_info.get_text(strip=True) if round_info else "Unknown Round"
-
-        league_link = soup.find("a", id="ctl00_cphMain_hplDivision")
-        league_text = league_link.get_text(strip=True) if league_link else "Unknown League"
-
-        # Get season info
-        season_info = soup.find("span", id="ctl00_cphMain_lblSeason")
-        season_text = season_info.get_text(strip=True) if season_info else "Unknown Season"
-
-        # Get venue and date
-        venue = soup.find("span", id="ctl00_cphMain_lblArena")
-        venue_text = venue.get_text(strip=True) if venue else "Unknown Venue"
-
-        match_date = soup.find("span", id="ctl00_cphMain_lblMatchDate")
-        date_text = match_date.get_text(strip=True) if match_date else "Unknown Date"
-
-        # Get referee
-        referee = soup.find("span", id="ctl00_cphMain_lblReferee")
-        referee_text = referee.get_text(strip=True) if referee else "Unknown Referee"
-
-        # Scrape match events (rows with class ItemStyle or ItemStyle2)
-        event_rows = soup.find_all("tr", class_=["ItemStyle", "ItemStyle2"])
-        events = []
-        for row in event_rows:
-            cells = row.find_all("td")
-            if len(cells) >= 3:
-                minute = cells[0].get_text(strip=True)
-                event = cells[1].get_text(strip=True)
-                player = cells[2].get_text(strip=True)
-                events.append(f"{minute} - {event}: {player}")
-
-        events_text = "\n".join(events) if events else "[No events recorded.]"
-
-        # Helper function to parse lineup table
-        def parse_lineup(table_id_prefix):
-            lineup = []
-            idx = 3  # Starting index from your example (ctl03, ctl04, etc.)
-            while True:
-                pos_id = f"ctl00_cphMain_dg{table_id_prefix}LineUp_ctl{idx:02d}_lbl{table_id_prefix}pos"
-                name_id = f"ctl00_cphMain_dg{table_id_prefix}LineUp_ctl{idx:02d}_hpl{table_id_prefix}PlayerName"
-
-                pos_tag = soup.find("span", id=pos_id)
-                name_tag = soup.find("a", id=name_id)
-                if not pos_tag or not name_tag:
-                    break
-
-                position = pos_tag.get_text(strip=True)
-                name = name_tag.get_text(strip=True)
-
-                # Extract rating and special icons from the title attribute or nearby img tags
-                title_text = name_tag.get("title", "")
-                rating = "N/A"
-                if "Grade:" in title_text:
-                    try:
-                        rating = title_text.split("Grade:")[1].split()[0]
-                    except IndexError:
-                        rating = "N/A"
-
-                # Look for assist, goal, booked, injured icons (via img with title attribute inside same td)
-                player_td = name_tag.parent
-                icons = []
-                for img in player_td.find_all("img"):
-                    icons.append(img.get("title"))
-
-                status = ", ".join(icons) if icons else ""
-
-                lineup.append(f"{position} {name} (Rating: {rating}" + (f"; {status}" if status else "") + ")")
-                idx += 1
-
-            return lineup
-
-        home_lineup = parse_lineup("Home")
-        away_lineup = parse_lineup("Away")
-
-        # Combine all info into a full match summary text for Gemini prompt
-        summary = (
-            f"Round: {round_text}\n"
-            f"League: {league_text}\n"
-            f"Season: {season_text}\n"
-            f"Venue: {venue_text}\n"
-            f"Date: {date_text}\n"
-            f"Referee: {referee_text}\n\n"
-            f"Home Lineup:\n" + "\n".join(home_lineup) + "\n\n"
-            f"Away Lineup:\n" + "\n".join(away_lineup) + "\n\n"
-            f"Match Events:\n{events_text}"
-        )
-
+        match_data = parse_match_data(match_html)
+        prompt = format_gemini_prompt(match_data)
+        summary = call_gemini_api(prompt)
         return summary
-
-
-def generate_gemini_summary(match_data):
-    headers = {"Content-Type": "application/json"}
-    params = {"key": GEMINI_API_KEY}
-    prompt = (
-        "You are a studio analyst for soccer channel FoxSportsGoon. "
-        "Summarize this soccer match like you are reporting the highlights to viewers, including lineups, player ratings, venue, league, referee, and match events:\n\n"
-        + match_data
-    )
-    payload = {
-        "contents": [
-            {"parts": [{"text": prompt}]}
-        ]
-    }
-
-    response = requests.post(GEMINI_API_URL, headers=headers, params=params, json=payload)
-    try:
-        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
-        return "[Gemini API failed to generate a summary.]"
 
 
 @app.route("/", methods=["GET"])
@@ -168,7 +237,7 @@ def index():
 @app.route("/webhook", methods=["POST"])
 def groupme_webhook():
     data = request.get_json()
-    sys.stderr.write(f"Webhook data received: {data}\n")  # Log incoming request
+    sys.stderr.write(f"Webhook data received: {data}\n")
 
     if not data:
         return "No data received", 400
@@ -180,8 +249,8 @@ def groupme_webhook():
         return "Ignoring my own message"
 
     if "FSGBot tell me about the last match" in text:
-        match_info = scrape_match_summary()
-        sys.stderr.write(f"Scraper output:\n{match_info}\n")
+        match_summary = scrape_and_summarize()
+        sys.stderr.write(f"Match summary:\n{match_summary}\n")
 
         failure_phrases = [
             "failed",
@@ -190,7 +259,7 @@ def groupme_webhook():
             "login to xpert eleven failed",
             "no events to summarize"
         ]
-        if any(phrase in match_info.lower() for phrase in failure_phrases):
+        if any(phrase in match_summary.lower() for phrase in failure_phrases):
             fallback_message = (
                 "Alright folks, we're experiencing some technical difficulties "
                 "with our Xpert Eleven feed, so no detailed match summary is available at the moment. "
@@ -199,9 +268,7 @@ def groupme_webhook():
             sys.stderr.write("Sending fallback message due to scraping failure.\n")
             send_groupme_message(fallback_message)
         else:
-            response = generate_gemini_summary(match_info)
-            sys.stderr.write(f"Gemini summary:\n{response}\n")
-            send_groupme_message(response)
+            send_groupme_message(match_summary)
 
     return "ok", 200
 
@@ -212,7 +279,9 @@ def send_groupme_message(text):
         "bot_id": GROUPME_BOT_ID,
         "text": text
     }
-    requests.post(url, json=payload)
+    response = requests.post(url, json=payload)
+    if response.status_code != 202:
+        sys.stderr.write(f"⚠️ Failed to send message to GroupMe: {response.status_code} {response.text}\n")
 
 
 if __name__ == "__main__":
