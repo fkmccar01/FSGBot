@@ -86,35 +86,19 @@ def parse_match_events(soup):
     return events
 
 def format_gemini_prompt(match_data, events, player_grades):
-    def annotate(text, player_grades):
-        sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
-        annotated = set()
-
-        for player in sorted_players:
-            name = player["name"]
-            pos = player["position"]
-            grade = player["grade"]
-            if not grade:
-                continue
-
-            def replacer(match):
-                matched_name = match.group(0)
-                if matched_name.lower() not in annotated:
-                    annotated.add(matched_name.lower())
-                    return f"{matched_name} ({pos}, {grade} 📊)"
-                return matched_name
-
-            text = re.sub(rf'\b{re.escape(name)}\b', replacer, text, flags=re.IGNORECASE)
-
-        return text
-
-    # 🔁 Annotate event strings BEFORE formatting
-    annotated_events = [annotate(e, player_grades) for e in events]
-    events_text = "\n".join(annotated_events)
-
-    referee_events = [e for e in annotated_events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
+    events_text = "\n".join(events)
+    referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
+    # Build the player grades section
+    ratings_lines = []
+    for p in player_grades:
+        if p["grade"]:  # only include rated players
+            line = f"{p['name']} ({p['position']}, {p['grade']} 📊)"
+            ratings_lines.append(line)
+    ratings_text = "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
+
+    # Prompt Gemini with instruction to annotate the first mention only
     prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
@@ -122,13 +106,12 @@ def format_gemini_prompt(match_data, events, player_grades):
         f"Match Events:\n{events_text}\n\n"
         f"Referee: {match_data['referee']}\n"
         f"Referee-related events:\n{referee_events_text}\n\n"
-        f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
-        f"Include who was the man of the match for the winning team.\n"
-        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
+        f"Player Grades (use this info to annotate players the FIRST time they are mentioned only):\n{ratings_text}\n\n"
+        f"Use the exact format: Name (Position, Grade 📊), e.g. Roy Henderson (M, 21 📊).\n"
+        f"Do NOT repeat annotations after the first mention.\n\n"
+        f"Highlight outstanding player performances, describe all goals and assists, mention injuries, and include who was the man of the match.\n"
+        f"Keep it short, TV highlight-style, fun and energetic."
     )
-
-    # 👇 Optional: also annotate the final prompt again, in case names appear elsewhere
-    prompt = annotate(prompt, player_grades)
 
     return prompt
 
