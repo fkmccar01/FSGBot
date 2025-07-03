@@ -337,12 +337,12 @@ def groupme_webhook():
 
     # Detect "highlights of the ___ match"
     if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["highlight", "recap"]):
-    team_query = normalize(text)
-
-    # List of league URLs to check
-        league_urls = [
-            os.environ.get("GOONDESLIGA_URL"),
-            os.environ.get("SPOONDESLIGA_URL")
+        team_query = normalize(text)
+    
+        # List of league URLs to check
+            league_urls = [
+                os.environ.get("GOONDESLIGA_URL"),
+                os.environ.get("SPOONDESLIGA_URL")
         ]
 
         for league_url in league_urls:
