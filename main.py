@@ -198,29 +198,33 @@ def remove_gemini_grades(summary, player_grades):
     return summary
 
 def annotate_players_in_text(summary, player_grades):
+    # Sort by name length to avoid partial overlaps
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
 
     for player in sorted_players:
-        name = player["name"]
-        last_name = name.split()[-1]
+        full_name = player["name"]
         pos = player["position"]
         grade = player["grade"]
 
-        if grade is None or pos is None:
+        if grade is None:
             continue
 
+        # Only annotate full name matches, case-insensitive
         def replacer(match):
-            matched_name = match.group(0)
-            key = matched_name.lower()
-            if key not in annotated:
-                annotated.add(key)
-                return f"{matched_name} ({pos}, {grade} 📊)"
-            return matched_name
+            matched_text = match.group(0)
+            if full_name.lower() not in annotated:
+                annotated.add(full_name.lower())
+                return f"{matched_text} ({pos}, {grade} 📊)"
+            return matched_text
 
-        for variant in [name, last_name]:
-            pattern = rf'(?<!\w)({re.escape(variant)})(?!\w)'
-            summary = re.sub(pattern, replacer, summary, flags=re.IGNORECASE)
+        # Avoid false matches: match full names as full words only
+        summary = re.sub(
+            rf'\b{re.escape(full_name)}\b',
+            replacer,
+            summary,
+            flags=re.IGNORECASE
+        )
 
     return summary
 
