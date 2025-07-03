@@ -181,10 +181,24 @@ def parse_player_grades(soup):
 
 import re
 
+import re
+
 def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
 
+    # Step 1: Remove ALL Gemini grades for all players from the entire text
+    for player in sorted_players:
+        name = player["name"]
+        # Remove ALL occurrences, global replacement
+        summary = re.sub(
+            rf"{re.escape(name)}\s*(?:\(Grade:\s*\d+\)|Grade:\s*\d+)",
+            name,
+            summary,
+            flags=re.IGNORECASE
+        )
+
+    # Step 2: Annotate only the first mention per player
     for player in sorted_players:
         name = player["name"]
         pos = player["position"]
@@ -193,22 +207,14 @@ def annotate_players_in_text(summary, player_grades):
         if grade is None:
             continue
 
-        # This matches: 
-        # - "Name"
-        # - "Name (rating X)"
-        # - "Name, with a rating of X"
-        # - "Name, X rating"
-        # We'll simplify by just stripping any mention of rating after the name.
-        pattern = rf"\b{name}(?:\s*\(rating\s*\d+\)|,\s*with a rating of \d+|,\s*\d+\s*rating)?"
-
         def replacer(match):
             if name not in annotated:
                 annotated.add(name)
                 return f"{name} ({pos}, {grade} 📊)"
             else:
-                return name  # leave name clean for repeat mentions
+                return name
 
-        summary = re.sub(pattern, replacer, summary)
+        summary = re.sub(rf"\b{re.escape(name)}\b", replacer, summary)
 
     return summary
 
