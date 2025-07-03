@@ -93,7 +93,6 @@ def format_gemini_prompt(match_data, events, player_grades):
         ratings_lines.append(line)
     ratings_text = "Player Ratings:\n" + "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
 
-def format_gemini_prompt(match_data, events, player_grades):
     def annotate(text, player_grades):
         sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
         annotated = set()
