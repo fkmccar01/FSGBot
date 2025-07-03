@@ -182,22 +182,32 @@ def parse_player_grades(soup):
 import re
 
 def annotate_players_in_text(summary, player_grades):
-    # Sort players by name length descending to avoid partial overlaps
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated_names = set()
 
-    def replace_first_mention(match):
-        name = match.group(0)
-        if name not in annotated_names:
-            annotated_names.add(name)
-            for player in sorted_players:
-                if player["name"] == name and player["grade"] is not None:
-                    return f"{name} ({player['position']}, {player['grade']} 📊)"
-        return name  # leave unannotated on later mentions
-
     for player in sorted_players:
-        # Replace only whole word matches (e.g., "Smith" not part of "Smithson")
-        summary = re.sub(rf'\b{re.escape(player["name"])}\b', replace_first_mention, summary)
+        name = re.escape(player["name"])  # escape special characters
+        grade = player["grade"]
+        pos = player["position"]
+
+        if grade is None:
+            continue
+
+        # Regex matches:
+        # - Just the name
+        # - Or name followed by (rating N)
+        pattern = rf"\b{name}(?:\s*\(rating\s*\d+\))?"
+
+        def replacer(match):
+            raw = match.group(0)
+            clean_name = player["name"]
+            if clean_name not in annotated_names:
+                annotated_names.add(clean_name)
+                return f"{clean_name} ({pos}, {grade} 📊)"
+            else:
+                return clean_name  # Later mentions just use the name
+
+        summary = re.sub(pattern, replacer, summary)
 
     return summary
 
