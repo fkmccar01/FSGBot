@@ -86,6 +86,12 @@ def format_gemini_prompt(match_data, events, player_grades):
     referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
+    ratings_lines = []
+    for p in player_grades:
+        line = f"{p['name']} ({p['position']}, {p['team']}) - Grade: {p['grade']}"
+        ratings_lines.append(line)
+    ratings_text = "Player Ratings:\n" + "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
+
     prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
