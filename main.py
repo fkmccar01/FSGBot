@@ -184,10 +184,17 @@ import re
 def remove_gemini_grades(summary, player_grades):
     for player in player_grades:
         name = re.escape(player["name"])
-        summary = re.sub(rf"{name}\s*\((Grade|grade|rating)\s*:\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{name}\s*(Grade|grade)\s*:\s*\d+", player["name"], summary, flags=re.IGNORECASE)
+
+        # Remove common Gemini-inserted patterns like:
+        # Name (Grade: 21), Name Grade: 21, Name (rating 21), etc.
+        summary = re.sub(rf"{name}\s*\((Grade|grade|rating)\s*:? ?\d+\)", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*(Grade|grade)\s*:? ?\d+", player["name"], summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{name}\s*\(rating\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{name}\s*rating\s*\d+", player["name"], summary, flags=re.IGNORECASE)
+
+    # NEW: Remove any lonely (14), (21), (8), etc. (Gemini might generate these)
+    summary = re.sub(r"\((\d{1,2})\)", "", summary)
+
     return summary
 
 def annotate_players_in_text(summary, player_grades):
