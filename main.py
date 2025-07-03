@@ -66,7 +66,12 @@ def parse_match_data(soup):  # 💡 Changed from HTML string to BeautifulSoup ob
 
 def parse_match_events(soup):
     events = []
+    impactful_players = set()
+    substitute_events = []
+
+    # Collect all event rows
     event_rows = soup.find_all("tr", class_="ItemStyle2")
+
     for row in event_rows:
         minute_td = row.find("span", id=lambda x: x and "lblEventTime" in x)
         minute = minute_td.text.strip() if minute_td else "?"
@@ -74,17 +79,43 @@ def parse_match_events(soup):
         desc_td = row.find("span", id=lambda x: x and "lblEventDesc" in x)
         desc = desc_td.text.strip() if desc_td else ""
 
-        # Remove any "(Grade: XX)" text from desc to avoid duplication
-        desc = re.sub(r"\(Grade:\s*\d+\)", "", desc)
-
         score_td = row.find_all("td")[2] if len(row.find_all("td")) > 2 else None
         score = score_td.text.strip() if score_td else ""
+
+        # Clean grades from description
+        desc = re.sub(r"\(Grade:\s*\d+\)", "", desc)
 
         event_text = f"{minute}' - {desc.strip()}"
         if score:
             event_text += f" (Score: {score})"
-        events.append(event_text)
+
+        # Check if it's a sub — temporarily hold it
+        if "subbed in" in desc.lower() or "substituted" in desc.lower():
+            substitute_events.append((desc, event_text))
+            continue
+
+        # Check if it's an impactful event
+        if any(keyword in desc.lower() for keyword in ["goal", "assist", "injured", "red card", "sent off"]):
+            # Extract player names from description
+            for word in desc.split():
+                if word[0].isupper():
+                    impactful_players.add(word)
+            events.append(event_text)
+        else:
+            events.append(event_text)
+
+    # Reinsert only the sub events where the sub made an impact
+    for desc, event_text in substitute_events:
+        subbed_in_player = extract_player_name_from_desc(desc)
+        if subbed_in_player and subbed_in_player in impactful_players:
+            events.append(event_text)
+
     return events
+
+def extract_player_name_from_desc(desc):
+    # crude way to pull a name from a substitution string
+    match = re.search(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", desc)
+    return match.group(1).strip() if match else None
 
 def format_gemini_prompt(match_data, events, player_grades):
     events_text = "\n".join(events)
