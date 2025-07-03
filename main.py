@@ -181,6 +181,19 @@ def parse_player_grades(soup):
 
 import re
 
+def remove_gemini_grades(summary, player_grades):
+    for player in player_grades:
+        name = re.escape(player["name"])
+
+        # Remove Gemini-inserted grade phrases like:
+        # "Name (Grade: 21)", "Name Grade: 21", "Name (rating 21)", etc.
+        summary = re.sub(rf"{name}\s*\((Grade|grade|rating)\s*:\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*(Grade|grade)\s*:\s*\d+", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*\(rating\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{name}\s*rating\s*\d+", player["name"], summary, flags=re.IGNORECASE)
+
+    return summary
+
 def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
@@ -207,19 +220,6 @@ def annotate_players_in_text(summary, player_grades):
 
         # Match whole word, case-insensitive
         summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE)
-
-    return summary
-
-def remove_gemini_grades(summary, player_grades):
-    for player in player_grades:
-        name = re.escape(player["name"])
-
-        # Remove Gemini-inserted grade phrases like:
-        # "Name (Grade: 21)", "Name Grade: 21", "Name (rating 21)", etc.
-        summary = re.sub(rf"{name}\s*\((Grade|grade|rating)\s*:\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{name}\s*(Grade|grade)\s*:\s*\d+", player["name"], summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{name}\s*\(rating\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{name}\s*rating\s*\d+", player["name"], summary, flags=re.IGNORECASE)
 
     return summary
 
