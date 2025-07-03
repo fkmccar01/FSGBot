@@ -206,10 +206,6 @@ def annotate_players_in_text(summary, player_grades):
         if grade is None:
             continue
 
-        # Remove Gemini-inserted "(Grade: X)" anywhere in the sentence
-        summary = re.sub(rf"{re.escape(name)}\s*\(Grade:\s*\d+\)", name, summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{re.escape(name)}\s*Grade:\s*\d+", name, summary, flags=re.IGNORECASE)
-
         # Now annotate the FIRST mention only
         def replacer(match):
             matched_name = match.group(0)
