@@ -12,7 +12,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 X11_USERNAME = os.environ.get("X11_USERNAME")
 X11_PASSWORD = os.environ.get("X11_PASSWORD")
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
