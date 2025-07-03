@@ -181,47 +181,32 @@ def parse_player_grades(soup):
 
 import re
 
-def inject_player_annotations(prompt_text, player_grades):
-    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
-    for player in sorted_players:
-        name = player["name"]
-        pos = player["position"]
-        grade = player["grade"]
-        if grade is None:
-            continue
-        annotated_name = f"{name} ({pos}, {grade} 📊)"
-        prompt_text = re.sub(rf'\b{re.escape(name)}\b', annotated_name, prompt_text, flags=re.IGNORECASE)
-    return prompt_text
-
 def remove_gemini_grades(summary, player_grades):
     for player in player_grades:
         name = re.escape(player["name"])
-        summary = re.sub(
-            rf"({name})\s*\((Grade|grade|rating)\s*:\s*\d+\)\s*",
-            r"\1 ", summary, flags=re.IGNORECASE)
-        summary = re.sub(
-            rf"({name})\s*(Grade|grade|rating)\s*:\s*\d+\s*",
-            r"\1 ", summary, flags=re.IGNORECASE)
-        summary = re.sub(
-            rf"({name})\s*\(rating\s*\d+\)\s*",
-            r"\1 ", summary, flags=re.IGNORECASE)
-        summary = re.sub(
-            rf"({name})\s*rating\s*\d+\s*",
-            r"\1 ", summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"({name})\s*\((Grade|grade|rating)\s*:?\s*\d+\)\s*", r"\1 ", summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"({name})\s*(Grade|grade|rating)\s*:?\s*\d+\s*", r"\1 ", summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"({name})\s*\(rating\s*\d+\)\s*", r"\1 ", summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"({name})\s*rating\s*\d+\s*", r"\1 ", summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"({name})\s+(at|rated)\s+\d+\s*", r"\1 ", summary, flags=re.IGNORECASE)
     summary = re.sub(r'\s+', ' ', summary).strip()
     return summary
 
 def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
+
     for player in sorted_players:
         name = player["name"]
         pos = player["position"]
         grade = player["grade"]
+
         if grade is None:
             continue
+
         summary = re.sub(rf"{re.escape(name)}\s*\(\d+\)\s*", f"{name} ", summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{re.escape(name)}\s*\((rated|Grade|grade|rating)\s*:?\s*\d+\)\s*", f"{name} ", summary, flags=re.IGNORECASE)
+
         def replacer(match):
             matched_name = match.group(0)
             key = matched_name.lower()
@@ -229,9 +214,27 @@ def annotate_players_in_text(summary, player_grades):
                 annotated.add(key)
                 return f"{matched_name} ({pos}, {grade} 📊)"
             return matched_name
+
         summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE, count=1)
+
     summary = re.sub(r'\s+', ' ', summary).strip()
     return summary
+
+def format_gemini_prompt(match_data, events, player_grades):
+    player_lines = [
+        f"{p['name']} ({p['position']}, {p['grade']} 📊)" for p in player_grades if p['grade'] is not None
+    ]
+    player_block = "\n".join(player_lines)
+
+    return f"""
+Match: {match_data['home_team']} vs {match_data['away_team']}\n
+Score: {match_data['home_score']} - {match_data['away_score']}\n
+Venue: {match_data['venue']}, Referee: {match_data['referee']}\n
+Man of the Match (Home): {match_data['motm_home']}\nMan of the Match (Away): {match_data['motm_away']}\n
+Player Ratings:\n{player_block}\n
+Match Events:\n{events}\n
+Generate a lively, fan-style match summary.
+"""
 
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
@@ -246,7 +249,7 @@ def scrape_and_summarize():
             viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
             eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
         except Exception:
-            sys.stderr.write("\u26a0\ufe0f Could not find login form hidden fields.\n")
+            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
             return "[Login form fields missing.]"
 
         login_payload = {
@@ -286,7 +289,6 @@ def scrape_and_summarize():
             match_data["motm_winner"] = "N/A"
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
-        prompt = inject_player_annotations(prompt, player_grades)  # Inject before sending
         summary = call_gemini_api(prompt)
 
         summary = remove_gemini_grades(summary, player_grades)
