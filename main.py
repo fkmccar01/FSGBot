@@ -185,15 +185,31 @@ def remove_gemini_grades(summary, player_grades):
     for player in player_grades:
         name = re.escape(player["name"])
 
-        # Catch Gemini-inserted variations
-        summary = re.sub(rf"{name}\s*\((Grade|grade|rating|rated)\s*:?\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{name}\s*(Grade|grade|rating|rated)\s*:?\s*\d+", player["name"], summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{name}\s*\(\d+\)", player["name"], summary, flags=re.IGNORECASE)
-
-    # Also catch lone phrases like "(rated 21)" or "(Grade: 8)"
-    summary = re.sub(r"\((Grade|grade|rating|rated)\s*:?\s*\d+\)", "", summary, flags=re.IGNORECASE)
-    summary = re.sub(r"\b(rated|grade|rating)\s*:?\s*\d+\b", "", summary, flags=re.IGNORECASE)
-
+        # Replace patterns like "Name (Grade: 21)" or "Name Grade: 21" with just "Name"
+        summary = re.sub(
+            rf"({name})\s*\((Grade|grade|rating)\s*:\s*\d+\)",
+            r"\1",  # keep the captured player name only
+            summary,
+            flags=re.IGNORECASE
+        )
+        summary = re.sub(
+            rf"({name})\s*(Grade|grade|rating)\s*:\s*\d+",
+            r"\1",
+            summary,
+            flags=re.IGNORECASE
+        )
+        summary = re.sub(
+            rf"({name})\s*\(rating\s*\d+\)",
+            r"\1",
+            summary,
+            flags=re.IGNORECASE
+        )
+        summary = re.sub(
+            rf"({name})\s*rating\s*\d+",
+            r"\1",
+            summary,
+            flags=re.IGNORECASE
+        )
     return summary
 
 def annotate_players_in_text(summary, player_grades):
