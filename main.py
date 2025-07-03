@@ -210,6 +210,14 @@ def annotate_players_in_text(summary, player_grades):
 
     return summary
 
+def remove_gemini_grades(summary, player_grades):
+    for player in player_grades:
+        name = player["name"]
+        # Match either: Name (Grade: X) OR Name Grade: X
+        pattern = rf"{re.escape(name)}\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)"
+        summary = re.sub(pattern, name, summary, flags=re.IGNORECASE)
+    return summary
+
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
@@ -264,6 +272,7 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
+        summary = remove_gemini_grades(summary, player_grades)
         summary = annotate_players_in_text(summary, player_grades)
         return summary
 
