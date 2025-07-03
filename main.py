@@ -128,6 +128,9 @@ def format_gemini_prompt(match_data, events, player_grades):
         f"Include who was the man of the match for the winning team.\n"
         f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
     )
+
+    prompt = annotate(prompt, player_grades)
+    
     return prompt
 
 def call_gemini_api(prompt):
