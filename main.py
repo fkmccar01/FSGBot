@@ -340,9 +340,9 @@ def groupme_webhook():
         team_query = normalize(text)
     
         # List of league URLs to check
-            league_urls = [
-                os.environ.get("GOONDESLIGA_URL"),
-                os.environ.get("SPOONDESLIGA_URL")
+        league_urls = [
+            os.environ.get("GOONDESLIGA_URL"),
+            os.environ.get("SPOONDESLIGA_URL")
         ]
 
         for league_url in league_urls:
