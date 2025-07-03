@@ -14,176 +14,21 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-
-def scrape_match_html(session, url):
-    """Fetch the match page HTML."""
-    response = session.get(url)
-    if response.status_code != 200:
-        sys.stderr.write(f"⚠️ Failed to get match page: {response.status_code}\n")
-        return None
-    return response.text
-
-
-def parse_match_data(html):
-    """Parse the match HTML and extract structured data."""
-    soup = BeautifulSoup(html, "html.parser")
-
-    # --- Teams and Score ---
-    try:
-        home_team = soup.find("a", id="ctl00_cphMain_hplHomeTeam").text.strip()
-        away_team = soup.find("a", id="ctl00_cphMain_hplAwayTeam").text.strip()
-        home_score = soup.find("span", id="ctl00_cphMain_lblHomeScore").text.strip()
-        away_score = soup.find("span", id="ctl00_cphMain_lblAwayScore").text.strip()
-        # halftime_score omitted as requested
-    except Exception:
-        sys.stderr.write("⚠️ Failed to parse teams and score\n")
-        home_team = away_team = home_score = away_score = "N/A"
-
-    # --- Match Info ---
-    try:
-        round_info = soup.find("span", id="ctl00_cphMain_lblOmgang").text.strip()
-        league = soup.find("a", id="ctl00_cphMain_hplDivision").text.strip()
-        venue = soup.find("span", id="ctl00_cphMain_lblArena").text.strip()
-        referee = soup.find("span", id="ctl00_cphMain_lblReferee").text.strip()
-    except Exception:
-        sys.stderr.write("⚠️ Failed to parse match info\n")
-        round_info = league = venue = referee = "N/A"
-
-    # --- Parse lineups for both teams ---
-    def parse_lineup(table_id):
-        lineup = []
-        table = soup.find("table", id=table_id)
-        if not table:
-            return lineup
-        rows = table.find_all("tr")
-        for row in rows[1:]:  # skip header row
-            cells = row.find_all("td")
-            if len(cells) < 2:
-                continue
-            position = cells[0].text.strip()
-            player_link = cells[1].find("a")
-            if player_link:
-                player_name = player_link.text.strip()
-                title = player_link.get("title", "")
-                grade = "N/A"
-                goal = assist = booked = injured = False
-                for line in title.split("\n"):
-                    line = line.strip()
-                    if line.startswith("Grade:"):
-                        grade = line.replace("Grade:", "").strip()
-                    if "Goal:" in line:
-                        goal = True
-                    if "Assist:" in line:
-                        assist = True
-                    if "Booked" in line:
-                        booked = True
-                    if "Injured" in line:
-                        injured = True
-                lineup.append({
-                    "position": position,
-                    "name": player_name,
-                    "grade": grade,
-                    "goal": goal,
-                    "assist": assist,
-                    "booked": booked,
-                    "injured": injured
-                })
-        return lineup
-
-    home_lineup = parse_lineup("ctl00_cphMain_dgHomeLineUp")
-    away_lineup = parse_lineup("ctl00_cphMain_dgAwayLineUp")
-
-    return {
-        "home_team": home_team,
-        "away_team": away_team,
-        "home_score": home_score,
-        "away_score": away_score,
-        "round_info": round_info,
-        "league": league,
-        "venue": venue,
-        "referee": referee,
-        "home_lineup": home_lineup,
-        "away_lineup": away_lineup,
+def send_groupme_message(text):
+    url = "https://api.groupme.com/v3/bots/post"
+    payload = {
+        "bot_id": GROUPME_BOT_ID,
+        "text": text
     }
-
-
-def parse_match_events(soup):
-    events = []
-    event_rows = soup.find_all("tr", class_="ItemStyle2")
-    for row in event_rows:
-        minute_td = row.find("span", id=lambda x: x and "lblEventTime" in x)
-        minute = minute_td.text.strip() if minute_td else "?"
-
-        desc_td = row.find("span", id=lambda x: x and "lblEventDesc" in x)
-        desc = desc_td.text.strip() if desc_td else ""
-
-        score_td = row.find_all("td")[2] if len(row.find_all("td")) > 2 else None
-        score = score_td.text.strip() if score_td else ""
-
-        event_text = f"{minute}' - {desc}"
-        if score:
-            event_text += f" (Score: {score})"
-        events.append(event_text)
-    return events
-
-
-def format_gemini_prompt(match_data, events):
-    events_text = "\n".join(events)
-
-    # Extract referee-related events
-    referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
-    referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
-
-    prompt = (
-        f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
-        f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
-        f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
-
-        f"Match Events:\n{events_text}\n\n"
-
-        f"Referee: {match_data['referee']}\n"
-        f"Referee-related events:\n{referee_events_text}\n\n"
-
-        f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
-        f"Include who was the man of the match for the winning team.\n"
-        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
-    )
-    return prompt
-
-
-def call_gemini_api(prompt):
-    headers = {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": GEMINI_API_KEY,
-    }
-    body = {
-        "prompt": {
-            "text": prompt
-        },
-        "temperature": 0.7,
-        "candidate_count": 1,
-        "max_output_tokens": 400,
-        "top_p": 0.95,
-        "top_k": 40,
-    }
-
-    response = requests.post(GEMINI_API_URL, headers=headers, json=body)
-    if response.status_code != 200:
-        sys.stderr.write(f"⚠️ Gemini API error {response.status_code}: {response.text}\n")
-        return "[Failed to generate summary.]"
-
-    try:
-        data = response.json()
-        summary = data["candidates"][0]["output"]
-        return summary.strip()
-    except Exception as e:
-        sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
-        return "[Failed to generate summary.]"
-
+    response = requests.post(url, json=payload)
+    if response.status_code != 202:
+        sys.stderr.write(f"⚠️ Failed to send message to GroupMe: {response.status_code} {response.text}\n")
 
 def scrape_and_summarize():
+    sys.stderr.write("🔍 scrape_and_summarize() called\n")
+
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_id = "322737050"  # Change to dynamic if needed
+    match_id = "322737050"
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={match_id}&dh=2"
 
     with requests.Session() as session:
@@ -209,41 +54,35 @@ def scrape_and_summarize():
 
         login_response = session.post(login_url, data=login_payload)
         if "Logout" not in login_response.text:
+            sys.stderr.write("⚠️ Login to Xpert Eleven failed.\n")
             return "[Login to Xpert Eleven failed.]"
 
-        match_html = scrape_match_html(session, match_url)
-        if not match_html:
+        sys.stderr.write("✅ Logged into Xpert Eleven\n")
+
+        match_response = session.get(match_url)
+        if match_response.status_code != 200:
+            sys.stderr.write("⚠️ Failed to retrieve match page.\n")
             return "[Failed to retrieve match page.]"
 
+        match_html = match_response.text
+        sys.stderr.write("✅ Match HTML retrieved\n")
+
         soup = BeautifulSoup(match_html, "html.parser")
-        match_data = parse_match_data(match_html)
-        events = parse_match_events(soup)
+        try:
+            home_team = soup.find("a", id="ctl00_cphMain_hplHomeTeam").text.strip()
+            away_team = soup.find("a", id="ctl00_cphMain_hplAwayTeam").text.strip()
+            home_score = soup.find("span", id="ctl00_cphMain_lblHomeScore").text.strip()
+            away_score = soup.find("span", id="ctl00_cphMain_lblAwayScore").text.strip()
+        except Exception:
+            return "[Failed to parse team info.]"
 
-        # Man of the Match
-        motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
-        motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
-        match_data["motm_home"] = motm_home.text.strip() if motm_home else "N/A"
-        match_data["motm_away"] = motm_away.text.strip() if motm_away else "N/A"
-
-        if match_data["home_score"].isdigit() and match_data["away_score"].isdigit():
-            if int(match_data["home_score"]) > int(match_data["away_score"]):
-                match_data["motm_winner"] = match_data["motm_home"]
-            elif int(match_data["away_score"]) > int(match_data["home_score"]):
-                match_data["motm_winner"] = match_data["motm_away"]
-            else:
-                match_data["motm_winner"] = "Match drawn, no MoTM winner"
-        else:
-            match_data["motm_winner"] = "N/A"
-
-        prompt = format_gemini_prompt(match_data, events)
-        summary = call_gemini_api(prompt)
+        summary = f"Match: {home_team} {home_score} - {away_score} {away_team}"
+        sys.stderr.write(f"✅ Summary composed: {summary}\n")
         return summary
-
 
 @app.route("/", methods=["GET"])
 def index():
     return "FSGBot is alive!"
-
 
 @app.route("/webhook", methods=["POST"])
 def groupme_webhook():
@@ -259,41 +98,11 @@ def groupme_webhook():
     if sender_type == "bot":
         return "Ignoring my own message"
 
-    if "FSGBot tell me about the last match" in text:
-        match_summary = scrape_and_summarize()
-        sys.stderr.write(f"Match summary:\n{match_summary}\n")
-
-        failure_phrases = [
-            "failed",
-            "no match",
-            "no events",
-            "login to xpert eleven failed",
-            "no events to summarize"
-        ]
-        if any(phrase in match_summary.lower() for phrase in failure_phrases):
-            fallback_message = (
-                "Alright folks, we're experiencing some technical difficulties "
-                "with our Xpert Eleven feed, so no detailed match summary is available at the moment. "
-                "Stay tuned to FoxSportsGoon for updates!"
-            )
-            sys.stderr.write("Sending fallback message due to scraping failure.\n")
-            send_groupme_message(fallback_message)
-        else:
-            send_groupme_message(match_summary)
+    if "FSGBot tell me" in text:
+        sys.stderr.write("🔁 Received trigger phrase, sending test message\n")
+        send_groupme_message("✅ FSGBot received your message and is working!")
 
     return "ok", 200
-
-
-def send_groupme_message(text):
-    url = "https://api.groupme.com/v3/bots/post"
-    payload = {
-        "bot_id": GROUPME_BOT_ID,
-        "text": text
-    }
-    response = requests.post(url, json=payload)
-    if response.status_code != 202:
-        sys.stderr.write(f"⚠️ Failed to send message to GroupMe: {response.status_code} {response.text}\n")
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
