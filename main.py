@@ -1,9 +1,9 @@
-
 from flask import Flask, request
 import os
 import requests
 from bs4 import BeautifulSoup
 import sys
+import re
 
 app = Flask(__name__)
 
@@ -14,21 +14,41 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
+def parse_lineup(soup, team_prefix):
+    lineup = []
+    # Grab all rows for lineup (both "ItemStyle" and "AlternatingItemStyle")
+    rows = soup.find_all("tr", class_=["ItemStyle", "AlternatingItemStyle"])
+    for row in rows:
+        pos_span = row.find("span", id=lambda x: x and team_prefix in x and "pos" in x)
+        name_a = row.find("a", id=lambda x: x and team_prefix in x and "PlayerName" in x)
+        if pos_span and name_a:
+            position = pos_span.text.strip()
+            name = name_a.text.strip()
+            title = name_a.get("title", "")
+            grade = None
+            grade_match = re.search(r"Grade:\s*(\d+)", title)
+            if grade_match:
+                grade = int(grade_match.group(1))
+            lineup.append({
+                "position": position,
+                "name": name,
+                "grade": grade
+            })
+    return lineup
+
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     matches_url = "https://www.xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
     with requests.Session() as session:
-        # First, get the login page to extract hidden fields (VIEWSTATE etc)
+        # Get login page for hidden fields
         initial_response = session.get(login_url)
         soup_initial = BeautifulSoup(initial_response.text, "html.parser")
-        
-        # Extract hidden form fields required for login
+
         viewstate = soup_initial.find("input", {"id": "__VIEWSTATE"})["value"]
         viewstategen = soup_initial.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
         eventvalidation = soup_initial.find("input", {"id": "__EVENTVALIDATION"})["value"]
 
-        # Prepare login payload with hidden fields + your credentials
         login_payload = {
             "__VIEWSTATE": viewstate,
             "__VIEWSTATEGENERATOR": viewstategen,
@@ -38,38 +58,48 @@ def scrape_match_summary():
             "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
         }
 
-        # Perform login POST
         response = session.post(login_url, data=login_payload)
 
-        # Write login response HTML to file for debugging
-        with open("login_debug.html", "w", encoding="utf-8") as f:
-            f.write(response.text)
-        sys.stderr.write("✅ Saved login_debug.html\n")
-
-        # Log first 2000 chars of login response
-        sys.stderr.write("=== LOGIN HTML (first 2000 chars) ===\n")
-        sys.stderr.write(response.text[:2000] + "\n")
-        sys.stderr.write("=== END LOGIN HTML ===\n")
-
-        # Check if login succeeded by looking for "Logout" in response
         if "Logout" not in response.text:
-            sys.stderr.write("⚠️ Login failed. Response didn't include 'Logout'.\n")
+            sys.stderr.write("⚠️ Login failed.\n")
             return "[Login to Xpert Eleven failed.]"
 
-        # Fetch match page after login
         match_response = session.get(matches_url)
         html = match_response.text
-
-        # Log first 1500 chars of match page
-        sys.stderr.write("=== Match Page HTML (first 1500 chars) ===\n")
-        sys.stderr.write(html[:1500] + "\n")
-
-        # Parse the match events table
         soup = BeautifulSoup(html, "html.parser")
-        event_table = soup.find("table", {"class": "eventlist"})
 
+        # Extract team names
+        home_team_tag = soup.find(id="ctl00_cphMain_hplHomeTeam")
+        home_team = home_team_tag.text.strip() if home_team_tag else "Unknown"
+
+        away_team_tag = soup.find(id="ctl00_cphMain_hplAwayTeam")
+        away_team = away_team_tag.text.strip() if away_team_tag else "Unknown"
+
+        # Extract scores
+        home_score_tag = soup.find(id="ctl00_cphMain_lblHomeScore")
+        home_score = home_score_tag.text.strip() if home_score_tag else "?"
+
+        away_score_tag = soup.find(id="ctl00_cphMain_lblAwayScore")
+        away_score = away_score_tag.text.strip() if away_score_tag else "?"
+
+        final_score = f"{home_score} - {away_score}"
+
+        # Extract venue, date, referee, league
+        venue_tag = soup.find(id="ctl00_cphMain_lblArena")
+        venue = venue_tag.text.strip() if venue_tag else "Unknown"
+
+        match_date_tag = soup.find(id="ctl00_cphMain_lblMatchDate")
+        match_date = match_date_tag.text.strip() if match_date_tag else "Unknown date/time"
+
+        referee_tag = soup.find(id="ctl00_cphMain_lblReferee")
+        referee = referee_tag.text.strip() if referee_tag else "Unknown"
+
+        league_tag = soup.find(id="ctl00_cphMain_hplDivision")
+        league = league_tag.text.strip() if league_tag else ""
+
+        # Parse event table
+        event_table = soup.find("table", {"class": "eventlist"})
         if not event_table:
-            sys.stderr.write("❌ Could not find 'eventlist' table in match page.\n")
             return "[No match events were found. Maybe the page layout changed.]"
 
         rows = event_table.find_all("tr")
@@ -82,12 +112,25 @@ def scrape_match_summary():
                 player = cells[2].get_text(strip=True)
                 summary_lines.append(f"{minute} - {event}: {player}")
 
-        return "\n".join(summary_lines) if summary_lines else "[No events to summarize.]"
+        events_summary = "\n".join(summary_lines) if summary_lines else "[No events to summarize.]"
+
+        # Compose full summary
+        full_summary = (
+            f"Match: {home_team} vs {away_team}\n"
+            f"Final Score: {final_score}\n"
+            f"Venue: {venue}\n"
+            f"Date: {match_date}\n"
+            f"{referee}\n"
+            f"League info: {league}\n\n"
+            f"Events:\n{events_summary}"
+        )
+
+        return full_summary
 
 def generate_gemini_summary(match_data):
     headers = {"Content-Type": "application/json"}
     params = {"key": GEMINI_API_KEY}
-    prompt = f"You are a studio analyst for soccer channel FoxSportsGoon. Summarize this soccer match like you are reporting the highlights to viewers:\n\n{match_data}"
+    prompt = f"You are a studio analyst for soccer channel FoxSportsGoon (FSG). Summarize this soccer match in the style of a SportsCenter recap:\n\n{match_data}"
     payload = {
         "contents": [
             {"parts": [{"text": prompt}]}
