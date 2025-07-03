@@ -187,29 +187,31 @@ def remove_gemini_grades(summary, player_grades):
 
         # Replace patterns like "Name (Grade: 21)" or "Name Grade: 21" with just "Name"
         summary = re.sub(
-            rf"({name})\s*\((Grade|grade|rating)\s*:\s*\d+\)",
-            r"\1",  # keep the captured player name only
+            rf"({name})\s*\((Grade|grade|rating)\s*:\s*\d+\)\s*",
+            r"\1 ",
             summary,
             flags=re.IGNORECASE
         )
         summary = re.sub(
-            rf"({name})\s*(Grade|grade|rating)\s*:\s*\d+",
-            r"\1",
+            rf"({name})\s*(Grade|grade|rating)\s*:\s*\d+\s*",
+            r"\1 ",
             summary,
             flags=re.IGNORECASE
         )
         summary = re.sub(
-            rf"({name})\s*\(rating\s*\d+\)",
-            r"\1",
+            rf"({name})\s*\(rating\s*\d+\)\s*",
+            r"\1 ",
             summary,
             flags=re.IGNORECASE
         )
         summary = re.sub(
-            rf"({name})\s*rating\s*\d+",
-            r"\1",
+            rf"({name})\s*rating\s*\d+\s*",
+            r"\1 ",
             summary,
             flags=re.IGNORECASE
         )
+    # Also strip extra spaces that might build up
+    summary = re.sub(r'\s+', ' ', summary).strip()
     return summary
 
 def annotate_players_in_text(summary, player_grades):
@@ -225,8 +227,8 @@ def annotate_players_in_text(summary, player_grades):
             continue
 
         # Clean leftover Gemini output like "Name (21)" or "Name (rated 21)"
-        summary = re.sub(rf"{re.escape(name)}\s*\(\d+\)", name, summary, flags=re.IGNORECASE)
-        summary = re.sub(rf"{re.escape(name)}\s*\((rated|Grade|grade|rating)\s*:?\s*\d+\)", name, summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{re.escape(name)}\s*\(\d+\)\s*", f"{name} ", summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{re.escape(name)}\s*\((rated|Grade|grade|rating)\s*:?\s*\d+\)\s*", f"{name} ", summary, flags=re.IGNORECASE)
 
         # Annotate only the FIRST match (case-insensitive full word)
         def replacer(match):
@@ -237,8 +239,10 @@ def annotate_players_in_text(summary, player_grades):
                 return f"{matched_name} ({pos}, {grade} 📊)"
             return matched_name
 
-        summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE)
+        summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE, count=1)
 
+    # Final cleanup of whitespace again
+    summary = re.sub(r'\s+', ' ', summary).strip()
     return summary
 
 def scrape_and_summarize():
