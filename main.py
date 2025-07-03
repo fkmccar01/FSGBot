@@ -185,36 +185,38 @@ def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
 
-    # Step 1: Remove Gemini's grades ONLY if they are in this exact format after the name
+    # Step 1: Remove ONLY Gemini's grade mentions *immediately* after the player name
     for player in sorted_players:
         name = player["name"]
-        # Remove only the grade mention, keep the name
-        # This removes ALL "(Grade: X)" or "Grade: X" AFTER the player name
-        summary = re.sub(
-            rf"({re.escape(name)})\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)",
-            r"\1",
-            summary,
-            flags=re.IGNORECASE
-        )
+        pattern = rf"({re.escape(name)})\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)"
+        summary_before = summary
+        summary = re.sub(pattern, r"\1", summary, flags=re.IGNORECASE)
+        if summary_before != summary:
+            print(f"Removed Gemini grade for player: {name}")
 
-    # Step 2: Annotate only the first mention per player
+    # Step 2: Annotate the first occurrence ONLY
     for player in sorted_players:
         name = player["name"]
         pos = player["position"]
         grade = player["grade"]
-
         if grade is None:
             continue
 
         def replacer(match):
             if name not in annotated:
                 annotated.add(name)
-                return f"{name} ({pos}, {grade} 📊)"
+                replacement = f"{name} ({pos}, {grade} 📊)"
+                print(f"Annotating {name} with: {replacement}")
+                return replacement
             else:
                 return name
 
-        # Whole word match for name only
-        summary = re.sub(rf"\b{re.escape(name)}\b", replacer, summary)
+        # Use word boundaries and ignore case for better matching
+        summary_before = summary
+        summary = re.sub(rf"\b{re.escape(name)}\b", replacer, summary, flags=re.IGNORECASE)
+        if summary_before != summary and name not in annotated:
+            # This indicates annotation failed for some reason
+            print(f"Failed to annotate {name}")
 
     return summary
 
