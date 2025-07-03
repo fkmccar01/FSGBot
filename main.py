@@ -182,33 +182,32 @@ def parse_player_grades(soup):
 import re
 
 def annotate_players_in_text(summary, player_grades):
+    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
-    for player in player_grades:
+
+    for player in sorted_players:
         name = player["name"]
         pos = player["position"]
         grade = player["grade"]
+
         if grade is None:
             continue
 
+        # Remove Gemini-inserted "(Grade: X)" anywhere in the sentence
+        summary = re.sub(rf"{re.escape(name)}\s*\(Grade:\s*\d+\)", name, summary, flags=re.IGNORECASE)
+        summary = re.sub(rf"{re.escape(name)}\s*Grade:\s*\d+", name, summary, flags=re.IGNORECASE)
+
+        # Now annotate the FIRST mention only
         def replacer(match):
-            if name not in annotated:
-                annotated.add(name)
-                return f"{name} ({pos}, {grade} 📊)"
-            else:
-                return name
+            matched_name = match.group(0)
+            if name.lower() not in annotated:
+                annotated.add(name.lower())
+                return f"{matched_name} ({pos}, {grade} 📊)"
+            return matched_name
 
-        pattern = re.escape(name)
-        summary, count = re.subn(pattern, replacer, summary, count=0)
-        if count > 0:
-            print(f"Annotated {count} occurrences of {name} (first only)")
+        # Match whole word, case-insensitive
+        summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE)
 
-    return summary
-
-def remove_gemini_grades(summary, player_grades):
-    for player in player_grades:
-        name = player["name"]
-        pattern = rf"({re.escape(name)})\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)"
-        summary = re.sub(pattern, r"\1", summary, flags=re.IGNORECASE)
     return summary
 
 def scrape_and_summarize():
@@ -266,7 +265,6 @@ def scrape_and_summarize():
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
         summary = annotate_players_in_text(summary, player_grades)
-        summary = remove_gemini_grades(summary, player_grades)
         return summary
 
 @app.route("/", methods=["GET"])
