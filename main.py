@@ -82,28 +82,47 @@ def parse_match_events(soup):
     return events
 
 def format_gemini_prompt(match_data, events, player_grades):
-    events_text = "\n".join(events)
-    referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
-    referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
+    def annotate(text, player_grades):
+        sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+        annotated = set()
 
-    ratings_lines = []
-    for p in player_grades:
-        line = f"{p['name']} ({p['position']}, {p['team']}) - Grade: {p['grade']}"
-        ratings_lines.append(line)
-    ratings_text = "Player Ratings:\n" + "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
+        for player in sorted_players:
+            name = player["name"]
+            pos = player["position"]
+            grade = player["grade"]
+            if not grade:
+                continue
 
-    prompt = (
-        f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
-        f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
-        f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
-        f"Match Events:\n{events_text}\n\n"
-        f"Referee: {match_data['referee']}\n"
-        f"Referee-related events:\n{referee_events_text}\n\n"
-        f"{ratings_text}\n\n"
-        f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
-        f"Include who was the man of the match for the winning team.\n"
-        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
-    )
+            # Annotate only the first occurrence
+            def replacer(match):
+                matched_name = match.group(0)
+                if matched_name.lower() not in annotated:
+                    annotated.add(matched_name.lower())
+                    return f"{matched_name} ({pos}, {grade} 📊)"
+                return matched_name
+
+            text = re.sub(rf'\b{re.escape(name)}\b', replacer, text, flags=re.IGNORECASE)
+
+        return text
+
+    # Build the core prompt
+    prompt = f"""You are a witty and insightful football analyst summarizing the match between {match_data['home_team']} and {match_data['away_team']}. The game ended {match_data['home_score']} - {match_data['away_score']}.
+
+Venue: {match_data.get('venue', 'N/A')}
+Referee: {match_data.get('referee', 'N/A')}
+Man of the Match: {match_data['motm_home']} (home), {match_data['motm_away']} (away). Winner: {match_data['motm_winner']}
+
+Key Match Events:
+"""
+
+    for e in events:
+        prompt += f"\n- {e}"
+
+    prompt += "\n\nWrite an energetic and engaging match summary, focusing on key moments, player impact, drama, and fan excitement. Use vivid language and a fun tone. Include goal scorers, assists, and key performances.\n"
+
+    # Annotate player names directly in the prompt
+    prompt = annotate(prompt, player_grades)
+
     return prompt
 
 def call_gemini_api(prompt):
