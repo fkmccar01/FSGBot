@@ -15,28 +15,8 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 
-def parse_match_events(soup):
-    events = []
-    event_rows = soup.find_all("tr", class_="ItemStyle2")
-    for row in event_rows:
-        minute_td = row.find("span", id=lambda x: x and "lblEventTime" in x)
-        minute = minute_td.text.strip() if minute_td else "?"
-
-        desc_td = row.find("span", id=lambda x: x and "lblEventDesc" in x)
-        desc = desc_td.text.strip() if desc_td else ""
-
-        tds = row.find_all("td")
-        score_td = tds[2] if len(tds) > 2 else None
-        score = score_td.text.strip() if score_td else ""
-
-        event_text = f"{minute}' - {desc}"
-        if score:
-            event_text += f" (Score: {score})"
-        events.append(event_text)
-    return events
-
-
 def scrape_match_html(session, url):
+    """Fetch the match page HTML."""
     response = session.get(url)
     if response.status_code != 200:
         sys.stderr.write(f"⚠️ Failed to get match page: {response.status_code}\n")
@@ -45,39 +25,38 @@ def scrape_match_html(session, url):
 
 
 def parse_match_data(html):
+    """Parse the match HTML and extract structured data."""
     soup = BeautifulSoup(html, "html.parser")
 
-    # Teams and scores
+    # --- Teams and Score ---
     try:
         home_team = soup.find("a", id="ctl00_cphMain_hplHomeTeam").text.strip()
         away_team = soup.find("a", id="ctl00_cphMain_hplAwayTeam").text.strip()
         home_score = soup.find("span", id="ctl00_cphMain_lblHomeScore").text.strip()
         away_score = soup.find("span", id="ctl00_cphMain_lblAwayScore").text.strip()
-        halftime_score = soup.find("span", id="ctl00_cphMain_lblHTScore").text.strip()
+        # halftime_score omitted as requested
     except Exception:
         sys.stderr.write("⚠️ Failed to parse teams and score\n")
-        home_team = away_team = home_score = away_score = halftime_score = "N/A"
+        home_team = away_team = home_score = away_score = "N/A"
 
-    # Match info
+    # --- Match Info ---
     try:
         round_info = soup.find("span", id="ctl00_cphMain_lblOmgang").text.strip()
         league = soup.find("a", id="ctl00_cphMain_hplDivision").text.strip()
-        season = soup.find("span", id="ctl00_cphMain_lblSeason").text.strip()
         venue = soup.find("span", id="ctl00_cphMain_lblArena").text.strip()
-        match_date = soup.find("span", id="ctl00_cphMain_lblMatchDate").text.strip()
         referee = soup.find("span", id="ctl00_cphMain_lblReferee").text.strip()
     except Exception:
         sys.stderr.write("⚠️ Failed to parse match info\n")
-        round_info = league = season = venue = match_date = referee = "N/A"
+        round_info = league = venue = referee = "N/A"
 
-    # Parse lineups
+    # --- Parse lineups for both teams ---
     def parse_lineup(table_id):
         lineup = []
         table = soup.find("table", id=table_id)
         if not table:
             return lineup
         rows = table.find_all("tr")
-        for row in rows[1:]:
+        for row in rows[1:]:  # skip header row
             cells = row.find_all("td")
             if len(cells) < 2:
                 continue
@@ -114,88 +93,61 @@ def parse_match_data(html):
     home_lineup = parse_lineup("ctl00_cphMain_dgHomeLineUp")
     away_lineup = parse_lineup("ctl00_cphMain_dgAwayLineUp")
 
-    # Parse events and extra stats
-    match_events = parse_match_events(soup)
-    possession = soup.find(id="ctl00_cphMain_lblPoss")
-    chances = soup.find(id="ctl00_cphMain_lblChance")
-    motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
-    motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
-
     return {
         "home_team": home_team,
         "away_team": away_team,
         "home_score": home_score,
         "away_score": away_score,
-        "halftime_score": halftime_score,
         "round_info": round_info,
         "league": league,
-        "season": season,
         "venue": venue,
-        "match_date": match_date,
         "referee": referee,
         "home_lineup": home_lineup,
         "away_lineup": away_lineup,
-        "match_events": match_events,
-        "possession": possession.text.strip() if possession else "N/A",
-        "chances": chances.text.strip() if chances else "N/A",
-        "motm_home": motm_home.text.strip() if motm_home else "N/A",
-        "motm_away": motm_away.text.strip() if motm_away else "N/A",
     }
 
 
-def format_gemini_prompt(match_data):
+def parse_match_events(soup):
+    events = []
+    event_rows = soup.find_all("tr", class_="ItemStyle2")
+    for row in event_rows:
+        minute_td = row.find("span", id=lambda x: x and "lblEventTime" in x)
+        minute = minute_td.text.strip() if minute_td else "?"
+
+        desc_td = row.find("span", id=lambda x: x and "lblEventDesc" in x)
+        desc = desc_td.text.strip() if desc_td else ""
+
+        score_td = row.find_all("td")[2] if len(row.find_all("td")) > 2 else None
+        score = score_td.text.strip() if score_td else ""
+
+        event_text = f"{minute}' - {desc}"
+        if score:
+            event_text += f" (Score: {score})"
+        events.append(event_text)
+    return events
+
+
+def format_gemini_prompt(match_data, events):
+    events_text = "\n".join(events)
+
+    # Extract referee-related events
+    referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
+    referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
+
     prompt = (
-        f"Write an exciting, brief summary of a soccer match with the following details:\n\n"
+        f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
-        f"Score: {match_data['home_score']} - {match_data['away_score']} (Halftime: {match_data['halftime_score']})\n"
-        f"Round: {match_data['round_info']}, League: {match_data['league']}, Season: {match_data['season']}\n"
-        f"Venue: {match_data['venue']}, Date: {match_data['match_date']}\n"
-        f"Referee: {match_data['referee']}\n\n"
+        f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
 
-        f"Home Team Lineup:\n"
+        f"Match Events:\n{events_text}\n\n"
+
+        f"Referee: {match_data['referee']}\n"
+        f"Referee-related events:\n{referee_events_text}\n\n"
+
+        f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
+        f"Include who was the man of the match for the winning team.\n"
+        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
     )
-    for player in match_data["home_lineup"]:
-        details = []
-        if player["goal"]:
-            details.append("Goal")
-        if player["assist"]:
-            details.append("Assist")
-        if player["booked"]:
-            details.append("Booked")
-        if player["injured"]:
-            details.append("Injured")
-        detail_str = f" ({', '.join(details)})" if details else ""
-        prompt += f"- {player['name']} [{player['position']}, Grade: {player['grade']}{detail_str}]\n"
-
-    prompt += "\nAway Team Lineup:\n"
-    for player in match_data["away_lineup"]:
-        details = []
-        if player["goal"]:
-            details.append("Goal")
-        if player["assist"]:
-            details.append("Assist")
-        if player["booked"]:
-            details.append("Booked")
-        if player["injured"]:
-            details.append("Injured")
-        detail_str = f" ({', '.join(details)})" if details else ""
-        prompt += f"- {player['name']} [{player['position']}, Grade: {player['grade']}{detail_str}]\n"
-
-    prompt += "\nMatch Events:\n"
-    if match_data["match_events"]:
-        for event in match_data["match_events"]:
-            prompt += f"- {event}\n"
-    else:
-        prompt += "No match events available.\n"
-
-    prompt += (
-        f"\nPossession: {match_data['possession']}\n"
-        f"Chances: {match_data['chances']}\n"
-        f"Man of the Match Home: {match_data['motm_home']}\n"
-        f"Man of the Match Away: {match_data['motm_away']}\n"
-    )
-
-    prompt += "\nSummarize the key events, highlight top performers, and make it exciting."
     return prompt
 
 
@@ -231,7 +183,7 @@ def call_gemini_api(prompt):
 
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_id = "322737050"  # Change or make dynamic as needed
+    match_id = "322737050"  # Change to dynamic if needed
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={match_id}&dh=2"
 
     with requests.Session() as session:
@@ -263,8 +215,27 @@ def scrape_and_summarize():
         if not match_html:
             return "[Failed to retrieve match page.]"
 
+        soup = BeautifulSoup(match_html, "html.parser")
         match_data = parse_match_data(match_html)
-        prompt = format_gemini_prompt(match_data)
+        events = parse_match_events(soup)
+
+        # Man of the Match
+        motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
+        motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
+        match_data["motm_home"] = motm_home.text.strip() if motm_home else "N/A"
+        match_data["motm_away"] = motm_away.text.strip() if motm_away else "N/A"
+
+        if match_data["home_score"].isdigit() and match_data["away_score"].isdigit():
+            if int(match_data["home_score"]) > int(match_data["away_score"]):
+                match_data["motm_winner"] = match_data["motm_home"]
+            elif int(match_data["away_score"]) > int(match_data["home_score"]):
+                match_data["motm_winner"] = match_data["motm_away"]
+            else:
+                match_data["motm_winner"] = "Match drawn, no MoTM winner"
+        else:
+            match_data["motm_winner"] = "N/A"
+
+        prompt = format_gemini_prompt(match_data, events)
         summary = call_gemini_api(prompt)
         return summary
 
