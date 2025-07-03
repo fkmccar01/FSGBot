@@ -179,6 +179,22 @@ def parse_player_grades(soup):
 
     return players
 
+import re
+
+def annotate_players_in_text(summary, player_grades):
+    # Sort players by name length descending to avoid partial overlaps
+    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+
+    for player in sorted_players:
+        pos = player["position"]
+        grade = player["grade"]
+        name = player["name"]
+        if grade is not None:
+            annotated_name = f"{name} ({pos}, {grade} 📊)"
+            # Replace exact player names with annotated version using word boundaries
+            summary = re.sub(rf"\b{name}\b", annotated_name, summary)
+    return summary
+
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
@@ -233,6 +249,7 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
+        summary = annotate_players_in_text(summary, player_grades)
         return summary
 
 @app.route("/", methods=["GET"])
