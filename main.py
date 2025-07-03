@@ -272,7 +272,7 @@ def scrape_and_summarize():
         summary = remove_gemini_grades(summary, player_grades)
         summary = annotate_players_in_text(summary, player_grades)
 
-return summary
+    return summary
 
 @app.route("/", methods=["GET"])
 def index():
