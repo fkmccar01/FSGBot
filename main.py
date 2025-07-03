@@ -3,7 +3,6 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import sys
-import re
 
 app = Flask(__name__)
 
@@ -14,34 +13,12 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-def parse_lineup(soup, team_prefix):
-    lineup = []
-    # Grab all rows for lineup (both "ItemStyle" and "AlternatingItemStyle")
-    rows = soup.find_all("tr", class_=["ItemStyle", "AlternatingItemStyle"])
-    for row in rows:
-        pos_span = row.find("span", id=lambda x: x and team_prefix in x and "pos" in x)
-        name_a = row.find("a", id=lambda x: x and team_prefix in x and "PlayerName" in x)
-        if pos_span and name_a:
-            position = pos_span.text.strip()
-            name = name_a.text.strip()
-            title = name_a.get("title", "")
-            grade = None
-            grade_match = re.search(r"Grade:\s*(\d+)", title)
-            if grade_match:
-                grade = int(grade_match.group(1))
-            lineup.append({
-                "position": position,
-                "name": name,
-                "grade": grade
-            })
-    return lineup
-
 def scrape_match_summary():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     matches_url = "https://www.xperteleven.com/gameDetails.aspx?GameID=322737050&dh=2"
 
     with requests.Session() as session:
-        # Get login page for hidden fields
+        # Step 1: Load login page
         initial_response = session.get(login_url)
         soup_initial = BeautifulSoup(initial_response.text, "html.parser")
 
@@ -60,51 +37,35 @@ def scrape_match_summary():
 
         response = session.post(login_url, data=login_payload)
 
+        with open("login_debug.html", "w", encoding="utf-8") as f:
+            f.write(response.text)
+        sys.stderr.write("✅ Saved login_debug.html\n")
+
+        sys.stderr.write("=== LOGIN HTML (first 2000 chars) ===\n")
+        sys.stderr.write(response.text[:2000] + "\n")
+        sys.stderr.write("=== END LOGIN HTML ===\n")
+
         if "Logout" not in response.text:
-            sys.stderr.write("⚠️ Login failed.\n")
+            sys.stderr.write("⚠️ Login failed. Response didn't include 'Logout'.\n")
             return "[Login to Xpert Eleven failed.]"
 
         match_response = session.get(matches_url)
         html = match_response.text
+
+        sys.stderr.write("=== Match Page HTML (first 1500 chars) ===\n")
+        sys.stderr.write(html[:1500] + "\n")
+
         soup = BeautifulSoup(html, "html.parser")
 
-        # Extract team names
-        home_team_tag = soup.find(id="ctl00_cphMain_hplHomeTeam")
-        home_team = home_team_tag.text.strip() if home_team_tag else "Unknown"
+        # ✅ Updated: Find events from rows with class="ItemStyle2"
+        event_rows = soup.find_all("tr", class_="ItemStyle2")
 
-        away_team_tag = soup.find(id="ctl00_cphMain_hplAwayTeam")
-        away_team = away_team_tag.text.strip() if away_team_tag else "Unknown"
-
-        # Extract scores
-        home_score_tag = soup.find(id="ctl00_cphMain_lblHomeScore")
-        home_score = home_score_tag.text.strip() if home_score_tag else "?"
-
-        away_score_tag = soup.find(id="ctl00_cphMain_lblAwayScore")
-        away_score = away_score_tag.text.strip() if away_score_tag else "?"
-
-        final_score = f"{home_score} - {away_score}"
-
-        # Extract venue, date, referee, league
-        venue_tag = soup.find(id="ctl00_cphMain_lblArena")
-        venue = venue_tag.text.strip() if venue_tag else "Unknown"
-
-        match_date_tag = soup.find(id="ctl00_cphMain_lblMatchDate")
-        match_date = match_date_tag.text.strip() if match_date_tag else "Unknown date/time"
-
-        referee_tag = soup.find(id="ctl00_cphMain_lblReferee")
-        referee = referee_tag.text.strip() if referee_tag else "Unknown"
-
-        league_tag = soup.find(id="ctl00_cphMain_hplDivision")
-        league = league_tag.text.strip() if league_tag else ""
-
-        # Parse event table
-        event_table = soup.find("table", {"class": "eventlist"})
-        if not event_table:
+        if not event_rows:
+            sys.stderr.write("❌ Could not find any 'ItemStyle2' rows for match events.\n")
             return "[No match events were found. Maybe the page layout changed.]"
 
-        rows = event_table.find_all("tr")
         summary_lines = []
-        for row in rows:
+        for row in event_rows:
             cells = row.find_all("td")
             if len(cells) >= 3:
                 minute = cells[0].get_text(strip=True)
@@ -112,25 +73,12 @@ def scrape_match_summary():
                 player = cells[2].get_text(strip=True)
                 summary_lines.append(f"{minute} - {event}: {player}")
 
-        events_summary = "\n".join(summary_lines) if summary_lines else "[No events to summarize.]"
-
-        # Compose full summary
-        full_summary = (
-            f"Match: {home_team} vs {away_team}\n"
-            f"Final Score: {final_score}\n"
-            f"Venue: {venue}\n"
-            f"Date: {match_date}\n"
-            f"{referee}\n"
-            f"League info: {league}\n\n"
-            f"Events:\n{events_summary}"
-        )
-
-        return full_summary
+        return "\n".join(summary_lines) if summary_lines else "[No events to summarize.]"
 
 def generate_gemini_summary(match_data):
     headers = {"Content-Type": "application/json"}
     params = {"key": GEMINI_API_KEY}
-    prompt = f"You are a studio analyst for soccer channel FoxSportsGoon (FSG). Summarize this soccer match in the style of a SportsCenter recap:\n\n{match_data}"
+    prompt = f"You are a studio analyst for soccer channel FoxSportsGoon (FSG). Summarize this soccer match in the style of a SportsCenter segment:\n\n{match_data}"
     payload = {
         "contents": [
             {"parts": [{"text": prompt}]}
@@ -150,7 +98,7 @@ def index():
 @app.route("/webhook", methods=["POST"])
 def groupme_webhook():
     data = request.get_json()
-    sys.stderr.write(f"Webhook data received: {data}\n")  # Log incoming request
+    sys.stderr.write(f"Webhook data received: {data}\n")
 
     if not data:
         return "No data received", 400
