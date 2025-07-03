@@ -181,56 +181,47 @@ def parse_player_grades(soup):
 
 import re
 
+def inject_player_annotations(prompt_text, player_grades):
+    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+    for player in sorted_players:
+        name = player["name"]
+        pos = player["position"]
+        grade = player["grade"]
+        if grade is None:
+            continue
+        annotated_name = f"{name} ({pos}, {grade} 📊)"
+        prompt_text = re.sub(rf'\b{re.escape(name)}\b', annotated_name, prompt_text, flags=re.IGNORECASE)
+    return prompt_text
+
 def remove_gemini_grades(summary, player_grades):
     for player in player_grades:
         name = re.escape(player["name"])
-
-        # Replace patterns like "Name (Grade: 21)" or "Name Grade: 21" with just "Name"
         summary = re.sub(
             rf"({name})\s*\((Grade|grade|rating)\s*:\s*\d+\)\s*",
-            r"\1 ",
-            summary,
-            flags=re.IGNORECASE
-        )
+            r"\1 ", summary, flags=re.IGNORECASE)
         summary = re.sub(
             rf"({name})\s*(Grade|grade|rating)\s*:\s*\d+\s*",
-            r"\1 ",
-            summary,
-            flags=re.IGNORECASE
-        )
+            r"\1 ", summary, flags=re.IGNORECASE)
         summary = re.sub(
             rf"({name})\s*\(rating\s*\d+\)\s*",
-            r"\1 ",
-            summary,
-            flags=re.IGNORECASE
-        )
+            r"\1 ", summary, flags=re.IGNORECASE)
         summary = re.sub(
             rf"({name})\s*rating\s*\d+\s*",
-            r"\1 ",
-            summary,
-            flags=re.IGNORECASE
-        )
-    # Also strip extra spaces that might build up
+            r"\1 ", summary, flags=re.IGNORECASE)
     summary = re.sub(r'\s+', ' ', summary).strip()
     return summary
 
 def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
-
     for player in sorted_players:
         name = player["name"]
         pos = player["position"]
         grade = player["grade"]
-
         if grade is None:
             continue
-
-        # Clean leftover Gemini output like "Name (21)" or "Name (rated 21)"
         summary = re.sub(rf"{re.escape(name)}\s*\(\d+\)\s*", f"{name} ", summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{re.escape(name)}\s*\((rated|Grade|grade|rating)\s*:?\s*\d+\)\s*", f"{name} ", summary, flags=re.IGNORECASE)
-
-        # Annotate only the FIRST match (case-insensitive full word)
         def replacer(match):
             matched_name = match.group(0)
             key = matched_name.lower()
@@ -238,10 +229,7 @@ def annotate_players_in_text(summary, player_grades):
                 annotated.add(key)
                 return f"{matched_name} ({pos}, {grade} 📊)"
             return matched_name
-
         summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE, count=1)
-
-    # Final cleanup of whitespace again
     summary = re.sub(r'\s+', ' ', summary).strip()
     return summary
 
@@ -258,7 +246,7 @@ def scrape_and_summarize():
             viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
             eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
         except Exception:
-            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
+            sys.stderr.write("\u26a0\ufe0f Could not find login form hidden fields.\n")
             return "[Login form fields missing.]"
 
         login_payload = {
@@ -279,7 +267,7 @@ def scrape_and_summarize():
 
         soup = BeautifulSoup(match_html, "html.parser")
         player_grades = parse_player_grades(soup)
-        match_data = parse_match_data(soup)  # ✅ Use soup now
+        match_data = parse_match_data(soup)
         events = parse_match_events(soup)
 
         motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
@@ -298,9 +286,9 @@ def scrape_and_summarize():
             match_data["motm_winner"] = "N/A"
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
+        prompt = inject_player_annotations(prompt, player_grades)  # Inject before sending
         summary = call_gemini_api(prompt)
 
-        # Important: clean before annotation!
         summary = remove_gemini_grades(summary, player_grades)
         summary = annotate_players_in_text(summary, player_grades)
 
