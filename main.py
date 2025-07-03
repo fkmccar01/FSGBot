@@ -100,6 +100,7 @@ def format_gemini_prompt(match_data, events):
     return prompt
 
 def call_gemini_api(prompt):
+    import json  # make sure this is imported at the top
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GEMINI_API_KEY,
@@ -124,11 +125,14 @@ def call_gemini_api(prompt):
     try:
         data = response.json()
         sys.stderr.write(f"Gemini API response JSON:\n{json.dumps(data, indent=2)}\n")
-        return data["contents"][0]["parts"][0]["text"].strip()
+        
+        # ✅ Correct way to extract the summary
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
     except Exception as e:
         sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
         return "[Failed to generate summary.]"
-
+        
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
