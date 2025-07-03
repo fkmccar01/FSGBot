@@ -90,28 +90,16 @@ def format_gemini_prompt(match_data, events, player_grades):
     referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
-    # Build the player grades section
-    ratings_lines = []
-    for p in player_grades:
-        if p["grade"]:  # only include rated players
-            line = f"{p['name']} ({p['position']}, {p['grade']}📊)"
-            ratings_lines.append(line)
-    ratings_text = "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
-
-    # Prompt Gemini with instruction to annotate the first mention only
     prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
-        f"Highlight outstanding player performances, describe all goals and assists, mention injuries, and include who was the man of the match.\n"
-        f"Keep it short, TV highlight-style, fun and energetic."
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
         f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
         f"Match Events:\n{events_text}\n\n"
         f"Referee: {match_data['referee']}\n"
         f"Referee-related events:\n{referee_events_text}\n\n"
-        f"Player Grades (use this info to annotate players the FIRST time they are mentioned only):\n{ratings_text}\n\n"
-        f"Use the exact format: Name (Position, Grade📊), e.g. Roy Henderson (M, 21📊).\n"
-        f"Do NOT repeat annotations after the first mention.\n\n"
-    
+        f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
+        f"Include who was the man of the match for the winning team.\n"
+        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
     )
 
     return prompt
@@ -163,13 +151,12 @@ def annotate_once_only(text, player_grades):
         if not grade:
             continue
 
-        # Match name with or without a previous annotation in parentheses
+        # Match name with or without existing parentheses
         pattern = rf'\b{re.escape(name)}\b(?:\s*\(.*?\))?'
 
         def replacer(match):
-            matched_text = match.group(0)
             if name.lower() in annotated:
-                return name  # plain name after first mention
+                return name  # plain on repeat
             annotated.add(name.lower())
             return f"{name} ({pos}, {grade} 📊)"
 
@@ -220,7 +207,7 @@ import re
 
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_id = "322737050"
+    match_id = "322737050"  # or dynamic if you want
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={match_id}&dh=2"
 
     with requests.Session() as session:
@@ -252,7 +239,7 @@ def scrape_and_summarize():
 
         soup = BeautifulSoup(match_html, "html.parser")
         player_grades = parse_player_grades(soup)
-        match_data = parse_match_data(soup)  # ✅ Use soup now
+        match_data = parse_match_data(soup)
         events = parse_match_events(soup)
 
         motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
@@ -272,8 +259,8 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
-        clean_summary = annotate_once_only(summary, player_grades)
-        return clean_summary
+        annotated_summary = annotate_once_only(summary, player_grades)
+        return annotated_summary
 
 @app.route("/", methods=["GET"])
 def index():
