@@ -132,10 +132,10 @@ def format_gemini_prompt(match_data, events, player_grades):
 
     # Prompt Gemini with instruction to annotate the first mention only
     prompt = (
-        f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
-        f"Describe goals in detail. Also highlight injuries as they happened.\n"
+        f"You are a TV analyst for soccer channel FoxSportsGoon. You give exciting match recaps focusing on key match events.\n\n"
+        f"Describe goals in detail.\n"
         f"Include who was the man of the match for the winning team.\n"
-        f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
+        f"Keep it short and exciting, as if you were presenting highlights on TV."
         f"Refer to the timing of moments using phrases like 'in the 36th minute', 'just before halftime', 'early in the second half', etc.\n"
         f"Only annotate players the first time they are mentioned using this format: Name (Position, Grade 📊).\n"
         f"Don't repeat the annotations. Don't mention 'Grade:' or use rating scales like 8/10.\n\n"
