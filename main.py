@@ -182,20 +182,8 @@ def parse_player_grades(soup):
 import re
 
 def annotate_players_in_text(summary, player_grades):
-    sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
-
-    # Step 1: Remove ONLY Gemini's grade mentions *immediately* after the player name
-    for player in sorted_players:
-        name = player["name"]
-        pattern = rf"({re.escape(name)})\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)"
-        summary_before = summary
-        summary = re.sub(pattern, r"\1", summary, flags=re.IGNORECASE)
-        if summary_before != summary:
-            print(f"Removed Gemini grade for player: {name}")
-
-    # Step 2: Annotate the first occurrence ONLY
-    for player in sorted_players:
+    for player in player_grades:
         name = player["name"]
         pos = player["position"]
         grade = player["grade"]
@@ -205,19 +193,22 @@ def annotate_players_in_text(summary, player_grades):
         def replacer(match):
             if name not in annotated:
                 annotated.add(name)
-                replacement = f"{name} ({pos}, {grade} 📊)"
-                print(f"Annotating {name} with: {replacement}")
-                return replacement
+                return f"{name} ({pos}, {grade} 📊)"
             else:
                 return name
 
-        # Use word boundaries and ignore case for better matching
-        summary_before = summary
-        summary = re.sub(rf"\b{re.escape(name)}\b", replacer, summary, flags=re.IGNORECASE)
-        if summary_before != summary and name not in annotated:
-            # This indicates annotation failed for some reason
-            print(f"Failed to annotate {name}")
+        pattern = re.escape(name)
+        summary, count = re.subn(pattern, replacer, summary, count=0)
+        if count > 0:
+            print(f"Annotated {count} occurrences of {name} (first only)")
 
+    return summary
+
+def remove_gemini_grades(summary, player_grades):
+    for player in player_grades:
+        name = player["name"]
+        pattern = rf"({re.escape(name)})\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)"
+        summary = re.sub(pattern, r"\1", summary, flags=re.IGNORECASE)
     return summary
 
 def scrape_and_summarize():
@@ -275,6 +266,7 @@ def scrape_and_summarize():
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
         summary = annotate_players_in_text(summary, player_grades)
+        summary = remove_gemini_grades(summary, player_grades)
         return summary
 
 @app.route("/", methods=["GET"])
