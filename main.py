@@ -73,10 +73,13 @@ def parse_match_events(soup):
         desc_td = row.find("span", id=lambda x: x and "lblEventDesc" in x)
         desc = desc_td.text.strip() if desc_td else ""
 
+        # Remove any "(Grade: XX)" text from desc to avoid duplication
+        desc = re.sub(r"\(Grade:\s*\d+\)", "", desc)
+
         score_td = row.find_all("td")[2] if len(row.find_all("td")) > 2 else None
         score = score_td.text.strip() if score_td else ""
 
-        event_text = f"{minute}' - {desc}"
+        event_text = f"{minute}' - {desc.strip()}"
         if score:
             event_text += f" (Score: {score})"
         events.append(event_text)
