@@ -184,14 +184,10 @@ import re
 def remove_gemini_grades(summary, player_grades):
     for player in player_grades:
         name = re.escape(player["name"])
-
-        # Remove Gemini-inserted grade phrases like:
-        # "Name (Grade: 21)", "Name Grade: 21", "Name (rating 21)", etc.
         summary = re.sub(rf"{name}\s*\((Grade|grade|rating)\s*:\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{name}\s*(Grade|grade)\s*:\s*\d+", player["name"], summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{name}\s*\(rating\s*\d+\)", player["name"], summary, flags=re.IGNORECASE)
         summary = re.sub(rf"{name}\s*rating\s*\d+", player["name"], summary, flags=re.IGNORECASE)
-
     return summary
 
 def annotate_players_in_text(summary, player_grades):
@@ -203,15 +199,12 @@ def annotate_players_in_text(summary, player_grades):
         pos = player["position"]
         grade = player["grade"]
 
-        if grade is None:
+        if not grade:
             continue
-
-        print(f"Trying to annotate player: {name} ({pos}, {grade})")
 
         def replacer(match):
             matched_name = match.group(0)
             if name.lower() not in annotated:
-                print(f"Annotating first mention of {name}")
                 annotated.add(name.lower())
                 return f"{matched_name} ({pos}, {grade} 📊)"
             return matched_name
@@ -274,9 +267,12 @@ def scrape_and_summarize():
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
+
+        # Important: clean before annotation!
         summary = remove_gemini_grades(summary, player_grades)
         summary = annotate_players_in_text(summary, player_grades)
-        return summary
+
+return summary
 
 @app.route("/", methods=["GET"])
 def index():
