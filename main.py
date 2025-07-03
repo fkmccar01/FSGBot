@@ -181,19 +181,18 @@ def parse_player_grades(soup):
 
 import re
 
-import re
-
 def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
     annotated = set()
 
-    # Step 1: Remove ALL Gemini grades for all players from the entire text
+    # Step 1: Remove Gemini's grades ONLY if they are in this exact format after the name
     for player in sorted_players:
         name = player["name"]
-        # Remove ALL occurrences, global replacement
+        # Remove only the grade mention, keep the name
+        # This removes ALL "(Grade: X)" or "Grade: X" AFTER the player name
         summary = re.sub(
-            rf"{re.escape(name)}\s*(?:\(Grade:\s*\d+\)|Grade:\s*\d+)",
-            name,
+            rf"({re.escape(name)})\s*(\(Grade:\s*\d+\)|Grade:\s*\d+)",
+            r"\1",
             summary,
             flags=re.IGNORECASE
         )
@@ -214,6 +213,7 @@ def annotate_players_in_text(summary, player_grades):
             else:
                 return name
 
+        # Whole word match for name only
         summary = re.sub(rf"\b{re.escape(name)}\b", replacer, summary)
 
     return summary
