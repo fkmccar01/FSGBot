@@ -31,8 +31,7 @@ def scrape_match_html(session, url):
         return None
     return response.text
 
-def parse_match_data(html):
-    soup = BeautifulSoup(html, "html.parser")
+def parse_match_data(soup):  # 💡 Changed from HTML string to BeautifulSoup object
     try:
         home_team = soup.find("a", id="ctl00_cphMain_hplHomeTeam").text.strip()
         away_team = soup.find("a", id="ctl00_cphMain_hplAwayTeam").text.strip()
@@ -99,21 +98,39 @@ def format_gemini_prompt(match_data, events):
     )
     return prompt
 
-def query_gemini(prompt):
-    headers = {"Content-Type": "application/json"}
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+def call_gemini_api(prompt):
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GEMINI_API_KEY,
+    }
+    body = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(GEMINI_API_URL, headers=headers, json=body)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Gemini API error {response.status_code}: {response.text}\n")
+        return "[Failed to generate summary.]"
+
     try:
-        response = requests.post(GEMINI_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
         data = response.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+        sys.stderr.write(f"Gemini API response JSON:\n{json.dumps(data, indent=2)}\n")
+        return data["contents"][0]["parts"][0]["text"].strip()
     except Exception as e:
-        print("Gemini API error:", e)
-        return None
+        sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
+        return "[Failed to generate summary.]"
 
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_id = "322737050"  # Change this to dynamic if you want
+    match_id = "322737050"
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={match_id}&dh=2"
 
     with requests.Session() as session:
@@ -144,10 +161,9 @@ def scrape_and_summarize():
             return "[Failed to retrieve match page.]"
 
         soup = BeautifulSoup(match_html, "html.parser")
-        match_data = parse_match_data(match_html)
+        match_data = parse_match_data(soup)  # ✅ Use soup now
         events = parse_match_events(soup)
 
-        # Man of the Match
         motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
         motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
         match_data["motm_home"] = motm_home.text.strip() if motm_home else "N/A"
@@ -183,7 +199,6 @@ def groupme_webhook():
     sender_type = data.get("sender_type", "")
 
     if sender_type == "bot":
-        # Ignore messages from bots (including self)
         return "Ignoring bot message"
 
     if "FSGBot tell me" in text:
@@ -195,5 +210,4 @@ def groupme_webhook():
     return "ok", 200
 
 if __name__ == "__main__":
-    # Listen on all interfaces on port 10000
     app.run(host="0.0.0.0", port=10000)
