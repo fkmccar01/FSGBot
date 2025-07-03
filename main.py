@@ -183,29 +183,30 @@ import re
 
 def annotate_players_in_text(summary, player_grades):
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
-    annotated_names = set()
+    annotated = set()
 
     for player in sorted_players:
-        name = re.escape(player["name"])  # escape special characters
-        grade = player["grade"]
+        name = player["name"]
         pos = player["position"]
+        grade = player["grade"]
 
         if grade is None:
             continue
 
-        # Regex matches:
-        # - Just the name
-        # - Or name followed by (rating N)
-        pattern = rf"\b{name}(?:\s*\(rating\s*\d+\))?"
+        # This matches: 
+        # - "Name"
+        # - "Name (rating X)"
+        # - "Name, with a rating of X"
+        # - "Name, X rating"
+        # We'll simplify by just stripping any mention of rating after the name.
+        pattern = rf"\b{name}(?:\s*\(rating\s*\d+\)|,\s*with a rating of \d+|,\s*\d+\s*rating)?"
 
         def replacer(match):
-            raw = match.group(0)
-            clean_name = player["name"]
-            if clean_name not in annotated_names:
-                annotated_names.add(clean_name)
-                return f"{clean_name} ({pos}, {grade} 📊)"
+            if name not in annotated:
+                annotated.add(name)
+                return f"{name} ({pos}, {grade} 📊)"
             else:
-                return clean_name  # Later mentions just use the name
+                return name  # leave name clean for repeat mentions
 
         summary = re.sub(pattern, replacer, summary)
 
