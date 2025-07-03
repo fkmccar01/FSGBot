@@ -105,16 +105,15 @@ def call_gemini_api(prompt):
         "X-Goog-Api-Key": GEMINI_API_KEY,
     }
     body = {
-        "prompt": {
-            "messages": [
-                {"author": "user", "content": {"text": prompt}}
-            ]
-        },
-        "temperature": 0.7,
-        "candidateCount": 1,
-        "maxOutputTokens": 400,
-        "topP": 0.95,
-        "topK": 40,
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
     }
 
     response = requests.post(GEMINI_API_URL, headers=headers, json=body)
@@ -124,8 +123,9 @@ def call_gemini_api(prompt):
 
     try:
         data = response.json()
-        summary = data["candidates"][0]["message"]["content"]["text"]
-        return summary.strip()
+        # The generated text will be in data['contents'][0]['parts'][0]['text']
+        generated_text = data["contents"][0]["parts"][0]["text"]
+        return generated_text.strip()
     except Exception as e:
         sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
         return "[Failed to generate summary.]"
