@@ -94,23 +94,24 @@ def format_gemini_prompt(match_data, events, player_grades):
     ratings_lines = []
     for p in player_grades:
         if p["grade"]:  # only include rated players
-            line = f"{p['name']} ({p['position']}, {p['grade']} 📊)"
+            line = f"{p['name']} ({p['position']}, {p['grade']}📊)"
             ratings_lines.append(line)
     ratings_text = "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
 
     # Prompt Gemini with instruction to annotate the first mention only
     prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
+        f"Highlight outstanding player performances, describe all goals and assists, mention injuries, and include who was the man of the match.\n"
+        f"Keep it short, TV highlight-style, fun and energetic."
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
         f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
         f"Match Events:\n{events_text}\n\n"
         f"Referee: {match_data['referee']}\n"
         f"Referee-related events:\n{referee_events_text}\n\n"
         f"Player Grades (use this info to annotate players the FIRST time they are mentioned only):\n{ratings_text}\n\n"
-        f"Use the exact format: Name (Position, Grade 📊), e.g. Roy Henderson (M, 21 📊).\n"
+        f"Use the exact format: Name (Position, Grade📊), e.g. Roy Henderson (M, 21📊).\n"
         f"Do NOT repeat annotations after the first mention.\n\n"
-        f"Highlight outstanding player performances, describe all goals and assists, mention injuries, and include who was the man of the match.\n"
-        f"Keep it short, TV highlight-style, fun and energetic."
+    
     )
 
     return prompt
