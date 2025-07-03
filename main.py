@@ -100,7 +100,9 @@ def groupme_webhook():
 
     if "FSGBot tell me" in text:
         sys.stderr.write("🔁 Received trigger phrase, sending test message\n")
-        send_groupme_message("✅ FSGBot received your message and is working!")
+        match_summary = scrape_and_summarize()
+        print("DEBUG match summary:", match_summary)  # Add this line for logs
+        send_groupme_message(match_summary)
 
     return "ok", 200
 
