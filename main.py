@@ -340,24 +340,24 @@ def groupme_webhook():
     team_query = normalize(text)
 
     # List of league URLs to check
-    league_urls = [
-        os.environ.get("GOONDESLIGA_URL"),
-        os.environ.get("SPOONDESLIGA_URL")
-    ]
+        league_urls = [
+            os.environ.get("GOONDESLIGA_URL"),
+            os.environ.get("SPOONDESLIGA_URL")
+        ]
 
-    for league_url in league_urls:
-        if not league_url:
-            continue
-
-        matches = get_latest_game_ids_from_league(league_url)
-        for m in matches:
-            home_normal = normalize(m["home_team"])
-            away_normal = normalize(m["away_team"])
-
-            if home_normal in team_query or away_normal in team_query:
-                summary = scrape_and_summarize_by_game_id(m["game_id"])
-                send_groupme_message(summary)
-                return "ok", 200
+        for league_url in league_urls:
+            if not league_url:
+                continue
+    
+            matches = get_latest_game_ids_from_league(league_url)
+            for m in matches:
+                home_normal = normalize(m["home_team"])
+                away_normal = normalize(m["away_team"])
+    
+                if home_normal in team_query or away_normal in team_query:
+                    summary = scrape_and_summarize_by_game_id(m["game_id"])
+                    send_groupme_message(summary)
+                    return "ok", 200
 
     send_groupme_message("Sorry, I couldn’t find a recent match for any team in your message.")
     return "ok", 200
