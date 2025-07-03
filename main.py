@@ -1,5 +1,5 @@
 
-
+import unidecode
 import os
 import sys
 import requests
@@ -14,6 +14,8 @@ GROUPME_BOT_ID = os.environ.get("GROUPME_BOT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 X11_USERNAME = os.environ.get("X11_USERNAME")
 X11_PASSWORD = os.environ.get("X11_PASSWORD")
+GOONDESLIGA_URL = os.environ.get("GOONDESLIGA_URL")
+SPOONDESLIGA_URL = os.environ.get("SPOONDESLIGA_URL")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
@@ -224,6 +226,40 @@ def parse_player_grades(soup):
 
 import re
 
+def get_latest_game_ids_from_league(url):
+    from bs4 import BeautifulSoup
+    import re
+
+    with requests.Session() as session:
+        page = session.get(url)
+        if page.status_code != 200:
+            sys.stderr.write(f"⚠️ Failed to fetch league table: {page.status_code}\n")
+            return []
+
+        soup = BeautifulSoup(page.text, "html.parser")
+        game_links = soup.select('a[href*="gameDetails.aspx?GameID="]')
+        
+        matches = []
+        for link in game_links:
+            game_id_match = re.search(r"GameID=(\d+)", link["href"])
+            if game_id_match:
+                game_id = game_id_match.group(1)
+                # Get the text content from the row that contains this link
+                row = link.find_parent("tr")
+                if not row:
+                    continue
+                cells = row.find_all("td")
+                if len(cells) >= 3:
+                    home = cells[1].text.strip()
+                    away = cells[3].text.strip()
+                    matches.append({
+                        "home_team": home,
+                        "away_team": away,
+                        "game_id": game_id
+                    })
+
+        return matches
+
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
@@ -280,6 +316,63 @@ def scrape_and_summarize():
         summary = call_gemini_api(prompt)
         return summary
 
+def scrape_and_summarize_by_game_id(game_id):
+    login_url = "https://www.xperteleven.com/front_new3.aspx"
+    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
+
+    with requests.Session() as session:
+        login_page = session.get(login_url)
+        login_soup = BeautifulSoup(login_page.text, "html.parser")
+        try:
+            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
+            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
+        except Exception:
+            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
+            return "[Login form fields missing.]"
+
+        login_payload = {
+            "__VIEWSTATE": viewstate,
+            "__VIEWSTATEGENERATOR": viewstategen,
+            "__EVENTVALIDATION": eventvalidation,
+            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
+        }
+        login_response = session.post(login_url, data=login_payload)
+        if "Logout" not in login_response.text:
+            return "[Login to Xpert Eleven failed.]"
+
+        match_html = scrape_match_html(session, match_url)
+        if not match_html:
+            return "[Failed to retrieve match page.]"
+
+        soup = BeautifulSoup(match_html, "html.parser")
+        player_grades = parse_player_grades(soup)
+        match_data = parse_match_data(soup)
+        events = parse_match_events(soup)
+
+        motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
+        motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
+        match_data["motm_home"] = motm_home.text.strip() if motm_home else "N/A"
+        match_data["motm_away"] = motm_away.text.strip() if motm_away else "N/A"
+
+        if match_data["home_score"].isdigit() and match_data["away_score"].isdigit():
+            if int(match_data["home_score"]) > int(match_data["away_score"]):
+                match_data["motm_winner"] = match_data["motm_home"]
+            elif int(match_data["away_score"]) > int(match_data["home_score"]):
+                match_data["motm_winner"] = match_data["motm_away"]
+            else:
+                match_data["motm_winner"] = "Match drawn, no MoTM winner"
+        else:
+            match_data["motm_winner"] = "N/A"
+
+        prompt = format_gemini_prompt(match_data, events, player_grades)
+        return call_gemini_api(prompt)
+
+def normalize(text):
+    return unidecode.unidecode(text.strip().lower())
+
 @app.route("/", methods=["GET"])
 def index():
     return "FSGBot is alive!"
@@ -299,10 +392,27 @@ def groupme_webhook():
         return "Ignoring bot message"
 
     if "FSGBot tell me" in text:
-        sys.stderr.write("🔁 Received trigger phrase, generating match summary\n")
+        sys.stderr.write("🔁 Received trigger phrase, generating last match summary\n")
         summary = scrape_and_summarize()
-        sys.stderr.write(f"Generated summary: {summary}\n")
         send_groupme_message(summary)
+        return "ok", 200
+
+    # Detect "highlights of the ___ match"
+    match = re.search(r"highlights of the (.+?) match", text, re.IGNORECASE)
+    if match:
+        team_name_query = normalize(match.group(1))
+
+        # Check both leagues
+        for league_url in [GOONDESLIGA_URL, SPOONDESLIGA_URL]:
+            matches = get_latest_game_ids_from_league(league_url)
+            for m in matches:
+                if team_name_query in normalize(m["home_team"]) or team_name_query in normalize(m["away_team"]):
+                    summary = scrape_and_summarize_by_game_id(m["game_id"])
+                    send_groupme_message(summary)
+                    return "ok", 200
+
+        send_groupme_message(f"Sorry, I couldn’t find a recent match for '{team_name_query.title()}'.")
+        return "ok", 200
 
     return "ok", 200
 
