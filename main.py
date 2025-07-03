@@ -86,13 +86,14 @@ def format_gemini_prompt(match_data, events):
     referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
-    prompt = (
+        prompt = (
         f"FSGBot is a TV analyst for FoxSportsGoon who gives a short, exciting match recap focusing on key match events.\n\n"
         f"Match: {match_data['home_team']} vs {match_data['away_team']}\n"
         f"Score: {match_data['home_score']} - {match_data['away_score']}\n\n"
         f"Match Events:\n{events_text}\n\n"
         f"Referee: {match_data['referee']}\n"
         f"Referee-related events:\n{referee_events_text}\n\n"
+        f"{ratings_text}\n\n"
         f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
         f"Include who was the man of the match for the winning team.\n"
         f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
@@ -132,7 +133,46 @@ def call_gemini_api(prompt):
     except Exception as e:
         sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
         return "[Failed to generate summary.]"
-        
+
+import re
+
+def parse_player_grades(soup):
+    players = []
+
+    # Home team
+    home_rows = soup.select('#ctl00_cphMain_dgHomeLineUp tr.ItemStyle, #ctl00_cphMain_dgHomeLineUp tr.AlternatingItemStyle')
+    for row in home_rows:
+        pos_tag = row.find("span", id=lambda x: x and "lblHomepos" in x)
+        name_tag = row.find("a", id=lambda x: x and "hplHomePlayerName" in x)
+        if name_tag and pos_tag:
+            title = name_tag.get("title", "")
+            match = re.search(r"Grade:\s*(\d+)", title)
+            grade = int(match.group(1)) if match else None
+            players.append({
+                "team": "home",
+                "position": pos_tag.text.strip(),
+                "name": name_tag.text.strip(),
+                "grade": grade
+            })
+
+    # Away team
+    away_rows = soup.select('#ctl00_cphMain_dgAwayLineUp tr.ItemStyle, #ctl00_cphMain_dgAwayLineUp tr.AlternatingItemStyle')
+    for row in away_rows:
+        pos_tag = row.find("span", id=lambda x: x and "lblAwaypos" in x)
+        name_tag = row.find("a", id=lambda x: x and "hplAwayPlayerName" in x)
+        if name_tag and pos_tag:
+            title = name_tag.get("title", "")
+            match = re.search(r"Grade:\s*(\d+)", title)
+            grade = int(match.group(1)) if match else None
+            players.append({
+                "team": "away",
+                "position": pos_tag.text.strip(),
+                "name": name_tag.text.strip(),
+                "grade": grade
+            })
+
+    return players
+
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_id = "322737050"
@@ -166,6 +206,7 @@ def scrape_and_summarize():
             return "[Failed to retrieve match page.]"
 
         soup = BeautifulSoup(match_html, "html.parser")
+        player_grades = parse_player_grades(soup)
         match_data = parse_match_data(soup)  # ✅ Use soup now
         events = parse_match_events(soup)
 
@@ -184,7 +225,7 @@ def scrape_and_summarize():
         else:
             match_data["motm_winner"] = "N/A"
 
-        prompt = format_gemini_prompt(match_data, events)
+        prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
         return summary
 
