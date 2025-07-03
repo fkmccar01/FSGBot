@@ -99,42 +99,17 @@ def format_gemini_prompt(match_data, events):
     )
     return prompt
 
-def call_gemini_api(prompt):
-    headers = {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": GEMINI_API_KEY,
-    }
-    body = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-    }
-
-    response = requests.post(GEMINI_API_URL, headers=headers, json=body)
-    if response.status_code != 200:
-        sys.stderr.write(f"⚠️ Gemini API error {response.status_code}: {response.text}\n")
-        return "[Failed to generate summary.]"
-
+def query_gemini(prompt):
+    headers = {"Content-Type": "application/json"}
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
+        response = requests.post(GEMINI_API_URL, headers=headers, json=payload)
+        response.raise_for_status()
         data = response.json()
-        sys.stderr.write(f"Gemini API response JSON: {json.dumps(data, indent=2)}\n")  # Log entire response for debugging
-
-        # Here you can try extracting your generated text, e.g.:
-        # generated_text = data["contents"][0]["parts"][0]["text"]
-        # return generated_text.strip()
-
-        # But for now just return placeholder so you can see logs:
-        return "[Check logs for full Gemini response.]"
-
+        return data["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
-        sys.stderr.write(f"⚠️ Failed to parse Gemini API response: {e}\n")
-        return "[Failed to generate summary.]"
+        print("Gemini API error:", e)
+        return None
 
 def scrape_and_summarize():
     login_url = "https://www.xperteleven.com/front_new3.aspx"
