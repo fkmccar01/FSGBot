@@ -184,15 +184,21 @@ import re
 def annotate_players_in_text(summary, player_grades):
     # Sort players by name length descending to avoid partial overlaps
     sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
+    annotated_names = set()
+
+    def replace_first_mention(match):
+        name = match.group(0)
+        if name not in annotated_names:
+            annotated_names.add(name)
+            for player in sorted_players:
+                if player["name"] == name and player["grade"] is not None:
+                    return f"{name} ({player['position']}, {player['grade']} 📊)"
+        return name  # leave unannotated on later mentions
 
     for player in sorted_players:
-        pos = player["position"]
-        grade = player["grade"]
-        name = player["name"]
-        if grade is not None:
-            annotated_name = f"{name} ({pos}, {grade} 📊)"
-            # Replace exact player names with annotated version using word boundaries
-            summary = re.sub(rf"\b{name}\b", annotated_name, summary)
+        # Replace only whole word matches (e.g., "Smith" not part of "Smithson")
+        summary = re.sub(rf'\b{re.escape(player["name"])}\b', replace_first_mention, summary)
+
     return summary
 
 def scrape_and_summarize():
