@@ -206,15 +206,16 @@ def annotate_players_in_text(summary, player_grades):
         if grade is None:
             continue
 
-        # Now annotate the FIRST mention only
+        print(f"Trying to annotate player: {name} ({pos}, {grade})")
+
         def replacer(match):
             matched_name = match.group(0)
             if name.lower() not in annotated:
+                print(f"Annotating first mention of {name}")
                 annotated.add(name.lower())
                 return f"{matched_name} ({pos}, {grade} 📊)"
             return matched_name
 
-        # Match whole word, case-insensitive
         summary = re.sub(rf'\b{re.escape(name)}\b', replacer, summary, flags=re.IGNORECASE)
 
     return summary
