@@ -87,12 +87,6 @@ def format_gemini_prompt(match_data, events, player_grades):
     referee_events = [e for e in events if any(keyword in e.lower() for keyword in ["yellow card", "red card", "penalty", "disallowed goal"])]
     referee_events_text = "\n".join(referee_events) if referee_events else "No significant referee interventions."
 
-    ratings_lines = []
-    for p in player_grades:
-        line = f"{p['name']} ({p['position']}, {p['team']}) - Grade: {p['grade']}"
-        ratings_lines.append(line)
-    ratings_text = "Player Ratings:\n" + "\n".join(ratings_lines) if ratings_lines else "No player ratings available."
-
     def annotate(text, player_grades):
         sorted_players = sorted(player_grades, key=lambda p: len(p["name"]), reverse=True)
         annotated = set()
@@ -123,7 +117,6 @@ def format_gemini_prompt(match_data, events, player_grades):
         f"Match Events:\n{events_text}\n\n"
         f"Referee: {match_data['referee']}\n"
         f"Referee-related events:\n{referee_events_text}\n\n"
-        f"{ratings_text}\n\n"
         f"Highlight outstanding player performances (include player ratings), injuries, and describe the goals in detail.\n"
         f"Include who was the man of the match for the winning team.\n"
         f"Keep it short and exciting, as if FSGBot is presenting highlights on TV."
