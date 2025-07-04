@@ -370,6 +370,50 @@ def get_match_summary_and_grades(game_id):
         summary = call_gemini_api(prompt)
         return summary, player_grades
 
+def scrape_league_standings(league_url):
+    with requests.Session() as session:
+        response = session.get(league_url)
+        if response.status_code != 200:
+            sys.stderr.write(f"⚠️ Failed to fetch league standings: {response.status_code}\n")
+            return []
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
+        if not standings_table:
+            sys.stderr.write("⚠️ Could not find standings table.\n")
+            return []
+
+        standings = []
+        rows = standings_table.find_all("tr")[1:]  # Skip header
+
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 10:
+                continue
+
+            place = cells[0].text.strip()
+            team_tag = cells[2].find("a")
+            team_name = team_tag.text.strip() if team_tag else "Unknown"
+            games_played = cells[3].text.strip()
+            wins = cells[4].text.strip()
+            draws = cells[5].text.strip()
+            losses = cells[6].text.strip()
+            goal_diff = cells[8].text.strip()
+            points = cells[9].text.strip()
+
+            standings.append({
+                "place": int(place),
+                "name": team_name,
+                "games_played": int(games_played),
+                "wins": int(wins),
+                "draws": int(draws),
+                "losses": int(losses),
+                "goal_diff": int(goal_diff),
+                "points": int(points)
+            })
+
+        return standings
+
 def summarize_league(league_url):
     send_groupme_message("Working on your recap... 📝")
     matches = get_latest_game_ids_from_league(league_url)
