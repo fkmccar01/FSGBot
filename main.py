@@ -314,6 +314,127 @@ def scrape_and_summarize_by_game_id(game_id):
         prompt = format_gemini_prompt(match_data, events, player_grades)
         return call_gemini_api(prompt)
 
+def get_match_summary_and_grades(game_id):
+    login_url = "https://www.xperteleven.com/front_new3.aspx"
+    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
+
+    with requests.Session() as session:
+        login_page = session.get(login_url)
+        login_soup = BeautifulSoup(login_page.text, "html.parser")
+        try:
+            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
+            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
+        except Exception:
+            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
+            return "[Login form fields missing.]", []
+
+        login_payload = {
+            "__VIEWSTATE": viewstate,
+            "__VIEWSTATEGENERATOR": viewstategen,
+            "__EVENTVALIDATION": eventvalidation,
+            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
+        }
+
+        login_response = session.post(login_url, data=login_payload)
+        if "Logout" not in login_response.text:
+            return "[Login failed.]", []
+
+        match_html = scrape_match_html(session, match_url)
+        if not match_html:
+            return "[Failed to retrieve match page.]", []
+
+        soup = BeautifulSoup(match_html, "html.parser")
+        player_grades = parse_player_grades(soup)
+        match_data = parse_match_data(soup)
+        events = parse_match_events(soup)
+
+        motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
+        motm_away = soup.find(id="ctl00_cphMain_hplBestAway")
+        match_data["motm_home"] = motm_home.text.strip() if motm_home else "N/A"
+        match_data["motm_away"] = motm_away.text.strip() if motm_away else "N/A"
+
+        if match_data["home_score"].isdigit() and match_data["away_score"].isdigit():
+            if int(match_data["home_score"]) > int(match_data["away_score"]):
+                match_data["motm_winner"] = match_data["motm_home"]
+            elif int(match_data["away_score"]) > int(match_data["home_score"]):
+                match_data["motm_winner"] = match_data["motm_away"]
+            else:
+                match_data["motm_winner"] = "Match drawn, no MoTM winner"
+        else:
+            match_data["motm_winner"] = "N/A"
+
+        prompt = format_gemini_prompt(match_data, events, player_grades)
+        summary = call_gemini_api(prompt)
+        return summary, player_grades
+
+def summarize_league(league_url):
+    send_groupme_message("Working on your recap... 📝")
+    matches = get_latest_game_ids_from_league(league_url)
+    if not matches:
+        return "[Could not find recent matches in this league.]"
+
+    recent_summaries = []
+    all_players = []
+
+    for m in matches:
+        try:
+            summary, players = get_match_summary_and_grades(m["game_id"])
+            recent_summaries.append({
+                "home": m["home_team"],
+                "away": m["away_team"],
+                "summary": summary
+            })
+            all_players.extend(players)
+        except Exception as e:
+            sys.stderr.write(f"⚠️ Failed to process game {m['game_id']}: {e}\n")
+
+    # Sort players by grade and take top 3
+    top_players = sorted([p for p in all_players if p["grade"]], key=lambda x: -x["grade"])[:3]
+
+    # Extract standings
+    standings = get_league_standings(league_url)
+
+    # Format prompt for Gemini
+    return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
+
+def summarize_standings(standings):
+    if len(standings) < 7:
+        return "Not enough teams in the league to determine relegation or chase pack."
+
+    leader = standings[0]
+    leader_points = int(leader["points"])
+    sixth_place_points = int(standings[5]["points"]) if len(standings) > 5 else 0
+
+    chasing_teams = []
+    relegation_threat = []
+
+    for i, team in enumerate(standings[1:], start=1):  # skip leader
+        points = int(team["points"])
+        if points >= leader_points - 6:
+            chasing_teams.append(team)
+        if i >= 5 and points <= sixth_place_points + 4:
+            relegation_threat.append(team)
+
+    summary = f"🏆 Current leader: {leader['name']} with {leader['points']} points.\n"
+
+    if chasing_teams:
+        summary += "\n💥 Chasing pack:\n"
+        for team in chasing_teams:
+            summary += f"- {team['name']} ({team['points']} pts)\n"
+
+    summary += "\n⚠️ Relegation danger zone:\n"
+    if len(standings) >= 7:
+        summary += f"- 7th: {standings[6]['name']} ({standings[6]['points']} pts)\n"
+        summary += f"- 6th: {standings[5]['name']} ({standings[5]['points']} pts)\n"
+    for team in relegation_threat:
+        if team not in standings[5:7]:  # avoid repeating 6th/7th
+            summary += f"- {team['name']} ({team['points']} pts)\n"
+
+    return summary.strip()
+
 def normalize(text):
     return unidecode.unidecode(text.strip().lower())
 
@@ -335,16 +456,50 @@ def groupme_webhook():
     if sender_type == "bot":
         return "Ignoring bot message"
 
-    # ✅ Detect league recap requests
-    if "fsgbot" in text.lower():
-        lowered = text.lower()
-    
-        if any(league in lowered for league in ["goondesliga", "spoondesliga"]) and any(word in lowered for word in ["recap", "highlights", "update"]):
-            league = "goondesliga" if "goondesliga" in lowered else "spoondesliga"
-            sys.stderr.write(f"📝 Detected {league} recap request\n")
-            send_groupme_message(f"Working on your {league.title()} recap... 📝")
-            # 🔜 Replace with actual logic later
-            return "ok", 200
+    # Detect full league recap requests
+if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["recap", "update"]):
+    if "goondesliga" in text.lower():
+        send_groupme_message("Working on your Goondesliga recap... 📝")
+        league_url = os.environ.get("GOONDESLIGA_URL")
+    elif "spoondesliga" in text.lower():
+        send_groupme_message("Working on your Spoondesliga recap... 📝")
+        league_url = os.environ.get("SPOONDESLIGA_URL")
+    else:
+        send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
+        return "ok", 200
+
+    if not league_url:
+        send_groupme_message("Sorry, I couldn’t find the league URL.")
+        return "ok", 200
+
+    matches = get_latest_game_ids_from_league(league_url)
+    summaries = []
+    top_players = []
+
+    for match in matches:
+        result = scrape_and_summarize_by_game_id(match["game_id"])
+        summaries.append(result)
+
+        # extract top-rated player from each match (based on your player_grades if needed)
+        # for now, we just pull MoTM name as placeholder
+        motm = result.split(" (")[0]  # crude, you can refine
+        top_players.append(motm)
+
+    summary_text = "\n\n".join(summaries)
+    standings = scrape_league_standings(league_url)
+    standings_summary = summarize_standings(standings)
+
+    # Format output
+    final_message = (
+        f"📋 **{text.strip()}**\n\n"
+        f"⚽ **Match Summaries:**\n{summary_text}\n\n"
+        f"📊 Top performers:\n" +
+        "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
+        f"📈 **Standings Update:**\n{standings_summary}"
+    )
+
+    send_groupme_message(final_message[:1000])  # avoid GroupMe character limit
+    return "ok", 200
     
     # Detect "highlights of the ___ match"
     if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["highlight", "recap"]):
