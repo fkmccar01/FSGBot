@@ -564,15 +564,7 @@ def groupme_webhook():
         top_players = []
 
         for match in matches:
-            session = get_logged_in_session()
-            if not session:
-                send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
-                return "ok", 200
-            
-            match_html = scrape_match_html(session, f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
-            if not match_html:
-                sys.stderr.write(f"⚠️ Failed to retrieve match page for game {match['game_id']}\n")
-                continue  # skip this match
+            match_html = scrape_match_html(requests.Session(), f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
             soup = BeautifulSoup(match_html, "html.parser")
             match_data = parse_match_data(soup)
 
@@ -584,9 +576,9 @@ def groupme_webhook():
             if player_grades:
                 top_player = sorted([p for p in player_grades if p["grade"]], key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
-        
-                standings = scrape_league_standings(league_url)
-                standings_summary = summarize_standings(standings)
+
+        standings = scrape_league_standings(league_url)
+        standings_summary = summarize_standings(standings)
 
         final_message = (
             f"📋 **{text.strip()}**\n\n"
