@@ -391,25 +391,37 @@ def scrape_league_standings(league_url):
             if len(cells) < 10:
                 continue
 
+            def safe_int(text):
+                try:
+                    return int(text)
+                except Exception:
+                    return None
+
             place = cells[0].text.strip()
             team_tag = cells[2].find("a")
             team_name = team_tag.text.strip() if team_tag else "Unknown"
-            games_played = cells[3].text.strip()
-            wins = cells[4].text.strip()
-            draws = cells[5].text.strip()
-            losses = cells[6].text.strip()
-            goal_diff = cells[8].text.strip()
-            points = cells[9].text.strip()
+
+            games_played = safe_int(cells[3].text.strip())
+            wins = safe_int(cells[4].text.strip())
+            draws = safe_int(cells[5].text.strip())
+            losses = safe_int(cells[6].text.strip())
+            goal_diff = safe_int(cells[8].text.strip())
+            points = safe_int(cells[9].text.strip())
+
+            # Skip rows with missing critical info
+            if None in [games_played, wins, draws, losses, goal_diff, points]:
+                sys.stderr.write(f"⚠️ Skipping row with missing data: {row}\n")
+                continue
 
             standings.append({
-                "place": int(place),
+                "place": safe_int(place) or 0,
                 "name": team_name,
-                "games_played": int(games_played),
-                "wins": int(wins),
-                "draws": int(draws),
-                "losses": int(losses),
-                "goal_diff": int(goal_diff),
-                "points": int(points)
+                "games_played": games_played,
+                "wins": wins,
+                "draws": draws,
+                "losses": losses,
+                "goal_diff": goal_diff,
+                "points": points
             })
 
         return standings
