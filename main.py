@@ -335,6 +335,17 @@ def groupme_webhook():
     if sender_type == "bot":
         return "Ignoring bot message"
 
+    # ✅ Detect league recap requests
+    if "fsgbot" in text.lower():
+        lowered = text.lower()
+    
+        if any(league in lowered for league in ["goondesliga", "spoondesliga"]) and any(word in lowered for word in ["recap", "highlights", "update"]):
+            league = "goondesliga" if "goondesliga" in lowered else "spoondesliga"
+            sys.stderr.write(f"📝 Detected {league} recap request\n")
+            send_groupme_message(f"Working on your {league.title()} recap... 📝")
+            # 🔜 Replace with actual logic later
+            return "ok", 200
+    
     # Detect "highlights of the ___ match"
     if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["highlight", "recap"]):
         team_query = normalize(text)
