@@ -500,14 +500,16 @@ def groupme_webhook():
     if sender_type == "bot":
         return "Ignoring bot message"
 
-    # ✅ Everything below here must be inside the function
-    if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["recap", "update"]):
-        if "goondesliga" in text.lower():
+    text_lower = text.lower()
+
+    # Recap or update requests for leagues
+    if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]):
+        if "goondesliga" in text_lower:
+            league_url = GOONDESLIGA_URL
             send_groupme_message("Working on your Goondesliga recap... 📝")
-            league_url = os.environ.get("GOONDESLIGA_URL")
-        elif "spoondesliga" in text.lower():
+        elif "spoondesliga" in text_lower:
+            league_url = SPOONDESLIGA_URL
             send_groupme_message("Working on your Spoondesliga recap... 📝")
-            league_url = os.environ.get("SPOONDESLIGA_URL")
         else:
             send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
             return "ok", 200
@@ -521,11 +523,14 @@ def groupme_webhook():
         top_players = []
 
         for match in matches:
-            result = scrape_and_summarize_by_game_id(match["game_id"])
-            summaries.append(result)
+            summary = scrape_and_summarize_by_game_id(match["game_id"])
+            summaries.append(summary)
 
-            motm = result.split(" (")[0]
-            top_players.append(motm)
+            # TODO: Replace this with actual MOTM extraction from your parsing step
+            # For now, just append placeholder or parse summary for name
+            # e.g. top_players.append(extract_motm_from_summary(summary))
+            # or store motm_winner when scraping match
+            top_players.append("Unknown MOTM")
 
         summary_text = "\n\n".join(summaries)
         standings = scrape_league_standings(league_url)
@@ -539,7 +544,8 @@ def groupme_webhook():
             f"📈 **Standings Update:**\n{standings_summary}"
         )
 
-        send_groupme_message(final_message[:1000])
+        send_groupme_message(final_message[:1500])  # Increased limit
+
         return "ok", 200
     
     # Detect "highlights of the ___ match"
