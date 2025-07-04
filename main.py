@@ -498,7 +498,7 @@ def summarize_league(league_url):
     top_players = sorted([p for p in all_players if p["grade"]], key=lambda x: -x["grade"])[:3]
 
     # Extract standings
-    standings = get_league_standings(league_url)
+    standings = scrape_league_standings(league_url)
 
     # Format prompt for Gemini
     return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
