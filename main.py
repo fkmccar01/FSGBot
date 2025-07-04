@@ -449,7 +449,7 @@ def scrape_league_standings(league_url):
 
     return standings
 
-def summarize_league(league_url):
+def summarize_standings(league_url):
     send_groupme_message("Working on your recap... 📝")
     matches = get_latest_game_ids_from_league(league_url)
     if not matches:
