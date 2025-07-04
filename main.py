@@ -1,5 +1,6 @@
 
 
+
 import unidecode
 import os
 import sys
@@ -476,10 +477,11 @@ def summarize_standings(league_url):
     # Extract standings
     standings = scrape_league_standings(league_url)
 
-    return generate_league_summary(recent_summaries, top_players, standings)
-    
+    # Format prompt for Gemini
+    return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
+
 def generate_league_summary(match_results, top_performers, standings):
-    def analyze_standings(league_url):
+    def analyze_standings(standings):
         if len(standings) < 7:
             return "Not enough teams in the league to determine relegation or chase pack."
 
@@ -522,7 +524,7 @@ def generate_league_summary(match_results, top_performers, standings):
     )
 
     # Format standings recap
-    recap = analyze_standings(league_url)
+    recap = analyze_standings(standings)
 
     if isinstance(recap, str):
         standings_text = f"📈 Standings Update:\n{recap}"
