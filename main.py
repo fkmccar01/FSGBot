@@ -530,19 +530,23 @@ def groupme_webhook():
             send_groupme_message("Sorry, I couldn’t find the league URL.")
             return "ok", 200
 
-        matches = get_latest_game_ids_from_league(league_url)
+        match_scores = []
         summaries = []
         top_players = []
-
+        
         for match in matches:
-            summary = scrape_and_summarize_by_game_id(match["game_id"])
+            summary, player_grades = get_match_summary_and_grades(match["game_id"])
             summaries.append(summary)
-
-            # TODO: Replace this with actual MOTM extraction from your parsing step
-            # For now, just append placeholder or parse summary for name
-            # e.g. top_players.append(extract_motm_from_summary(summary))
-            # or store motm_winner when scraping match
-            top_players.append("Unknown MOTM")
+        
+            # Build match score line
+            match_data = parse_match_data(BeautifulSoup(scrape_match_html(requests.Session(), f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2"), "html.parser"))
+            score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
+            match_scores.append(score_line)
+        
+            # Get top player formatted like (Position, Grade 📊)
+            if player_grades:
+                top_player = sorted([p for p in player_grades if p["grade"]], key=lambda x: -x["grade"])[0]
+                top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
         summary_text = "\n\n".join(summaries)
         standings = scrape_league_standings(league_url)
@@ -550,8 +554,8 @@ def groupme_webhook():
 
         final_message = (
             f"📋 **{text.strip()}**\n\n"
-            f"⚽ **Match Summaries:**\n{summary_text}\n\n"
-            f"📊 Top performers:\n" +
+            f"⚽ **Match Results:**\n" + "\n".join(match_scores) + "\n\n"
+            f"📊 Top performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
             "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
             f"📈 **Standings Update:**\n{standings_summary}"
         )
