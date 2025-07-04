@@ -478,7 +478,7 @@ def summarize_league(league_url):
     return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
 
 def summarize_standings(standings):
-    if len(standings) < 7:
+    if len(standings) < 4:
         return "Not enough teams in the league to determine relegation or chase pack."
 
     leader = standings[0]
@@ -503,7 +503,7 @@ def summarize_standings(standings):
             summary += f"- {team['name']} ({team['points']} pts)\n"
 
     summary += "\n⚠️ Relegation danger zone:\n"
-    if len(standings) >= 7:
+    if len(standings) >= 4:
         summary += f"- 7th: {standings[6]['name']} ({standings[6]['points']} pts)\n"
         summary += f"- 6th: {standings[5]['name']} ({standings[5]['points']} pts)\n"
     for team in relegation_threat:
