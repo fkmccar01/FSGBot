@@ -1,6 +1,3 @@
-
-
-
 import unidecode
 import os
 import sys
