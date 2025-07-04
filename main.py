@@ -368,7 +368,7 @@ def get_match_summary_and_grades(game_id):
 
         prompt = format_gemini_prompt(match_data, events, player_grades)
         summary = call_gemini_api(prompt)
-        return summary, player_grades
+        return summary, player_grades, match_data
 
 def scrape_league_standings(league_url):
     with requests.Session() as session:
@@ -537,19 +537,18 @@ def groupme_webhook():
         top_players = []
 
         for match in matches:
-            summary, player_grades = get_match_summary_and_grades(match["game_id"])
+            summary, player_grades, match_data = get_match_summary_and_grades(match["game_id"])
             summaries.append(summary)
-
-            match_data = parse_match_data(BeautifulSoup(scrape_match_html(requests.Session(), f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2"), "html.parser"))
+        
             score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
             match_scores.append(score_line)
 
             if player_grades:
                 top_player = sorted([p for p in player_grades if p["grade"]], key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
-
-        standings = scrape_league_standings(league_url)
-        standings_summary = summarize_standings(standings)
+        
+                standings = scrape_league_standings(league_url)
+                standings_summary = summarize_standings(standings)
 
         final_message = (
             f"📋 **{text.strip()}**\n\n"
