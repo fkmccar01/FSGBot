@@ -29,6 +29,34 @@ def send_groupme_message(text):
     if response.status_code != 202:
         sys.stderr.write(f"⚠️ Failed to send message to GroupMe: {response.status_code} {response.text}\n")
 
+def get_logged_in_session():
+    login_url = "https://www.xperteleven.com/front_new3.aspx"
+    session = requests.Session()
+    login_page = session.get(login_url)
+    login_soup = BeautifulSoup(login_page.text, "html.parser")
+    try:
+        viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
+        viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+        eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
+    except Exception:
+        sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
+        return None
+
+    login_payload = {
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEGENERATOR": viewstategen,
+        "__EVENTVALIDATION": eventvalidation,
+        "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+        "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+        "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
+    }
+
+    login_response = session.post(login_url, data=login_payload)
+    if "Logout" not in login_response.text:
+        sys.stderr.write("⚠️ Login to Xpert Eleven failed.\n")
+        return None
+    return session
+
 def scrape_match_html(session, url):
     response = session.get(url)
     if response.status_code != 200:
@@ -536,7 +564,15 @@ def groupme_webhook():
         top_players = []
 
         for match in matches:
-            match_html = scrape_match_html(requests.Session(), f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
+            session = get_logged_in_session()
+            if not session:
+                send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
+                return "ok", 200
+            
+            match_html = scrape_match_html(session, f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
+            if not match_html:
+                sys.stderr.write(f"⚠️ Failed to retrieve match page for game {match['game_id']}\n")
+                continue  # skip this match
             soup = BeautifulSoup(match_html, "html.parser")
             match_data = parse_match_data(soup)
 
