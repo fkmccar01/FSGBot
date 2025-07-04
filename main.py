@@ -399,10 +399,15 @@ def get_match_summary_and_grades(game_id):
         summary = call_gemini_api(prompt)
         return summary, player_grades, match_data
 
-def scrape_league_standings(html):
-    from bs4 import BeautifulSoup
+def scrape_league_standings(league_url):
+    # Download the HTML from the URL
+    response = requests.get(league_url)
+    if response.status_code != 200:
+        raise Exception(f"Failed to load standings page: {response.status_code}")
 
+    html = response.text
     soup = BeautifulSoup(html, "html.parser")
+
     standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
     if not standings_table:
         raise ValueError("Standings table not found.")
@@ -413,7 +418,7 @@ def scrape_league_standings(html):
     for row in rows:
         cols = row.find_all("td")
         if len(cols) < 10:
-            continue  # skip malformed rows
+            continue
 
         try:
             place = cols[0].text.strip()
