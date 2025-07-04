@@ -447,7 +447,7 @@ def scrape_league_standings(league_url):
 
     return standings
 
-def summarize_standings(league_url):
+def summarize_league(league_url):
     send_groupme_message("Working on your recap... 📝")
     matches = get_latest_game_ids_from_league(league_url)
     if not matches:
@@ -477,88 +477,40 @@ def summarize_standings(league_url):
     # Format prompt for Gemini
     return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
 
-def generate_league_summary(match_results, top_performers, standings):
-    def analyze_standings(standings):
-        if len(standings) < 7:
-            return "Not enough teams in the league to determine relegation or chase pack."
+def summarize_standings(standings):
+    if len(standings) < 7:
+        return "Not enough teams in the league to determine relegation or chase pack."
 
-        leader = standings[0]
-        leader_points = leader["points"]
+    leader = standings[0]
+    leader_points = int(leader["points"])
+    sixth_place_points = int(standings[5]["points"]) if len(standings) > 5 else 0
 
-        # Chase pack: Teams within 6 points of the leader, excluding the leader
-        chase_pack = [
-            team for team in standings[1:-2]
-            if leader_points - team["points"] <= 6
-        ]
+    chasing_teams = []
+    relegation_threat = []
 
-        # Relegation zone: bottom 2 (6th and 7th)
-        relegation_zone = standings[-2:]
+    for i, team in enumerate(standings[1:], start=1):  # skip leader
+        points = int(team["points"])
+        if points >= leader_points - 6:
+            chasing_teams.append(team)
+        if i >= 5 and points <= sixth_place_points + 4:
+            relegation_threat.append(team)
 
-        # Relegation-threatened: anyone not in bottom 2, within 4 points of 6th place
-        sixth_place_points = relegation_zone[0]["points"]
-        relegation_threatened = [
-            team for team in standings[:-2]
-            if sixth_place_points - team["points"] <= 4
-        ]
+    summary = f"🏆 Current leader: {leader['name']} with {leader['points']} points.\n"
 
-        return {
-            "leader": leader,
-            "chase_pack": chase_pack,
-            "relegation_zone": relegation_zone,
-            "relegation_threatened": relegation_threatened,
-        }
+    if chasing_teams:
+        summary += "\n💥 Chasing pack:\n"
+        for team in chasing_teams:
+            summary += f"- {team['name']} ({team['points']} pts)\n"
 
-    # Format match results
-    results_text = "**⚽ Match Results:**\n" + "\n".join(
-        f"{match['home_team']} {match['home_score']}-{match['away_score']} {match['away_team']}"
-        for match in match_results
-    )
+    summary += "\n⚠️ Relegation danger zone:\n"
+    if len(standings) >= 7:
+        summary += f"- 7th: {standings[6]['name']} ({standings[6]['points']} pts)\n"
+        summary += f"- 6th: {standings[5]['name']} ({standings[5]['points']} pts)\n"
+    for team in relegation_threat:
+        if team not in standings[5:7]:  # avoid repeating 6th/7th
+            summary += f"- {team['name']} ({team['points']} pts)\n"
 
-    # Format top performers
-    performers_text = "**📊 Top performers:**\n" + "\n".join(
-        f"- {player['name']} ({player['position']}, {player['grade']} 📊)"
-        for player in top_performers[:3]
-    )
-
-    # Format standings recap
-    recap = analyze_standings(standings)
-
-    if isinstance(recap, str):
-        standings_text = f"📈 Standings Update:\n{recap}"
-    else:
-        leader_line = f"🏆 Leader: {recap['leader']['team']} ({recap['leader']['points']} pts)"
-
-        chase_lines = ""
-        if recap["chase_pack"]:
-            chase_lines = "⚔️ Chase Pack:\n" + "\n".join(
-                f"- {team['team']} ({team['points']} pts)" for team in recap["chase_pack"]
-            )
-
-        relegation_lines = "📉 Relegation Zone:\n" + "\n".join(
-            f"{i+6}. {team['team']} ({team['points']} pts)" for i, team in enumerate(recap["relegation_zone"])
-        )
-
-        threatened_lines = ""
-        if recap["relegation_threatened"]:
-            threatened_lines = "⚠️ In Danger:\n" + "\n".join(
-                f"- {team['team']} ({team['points']} pts)" for team in recap["relegation_threatened"]
-            )
-
-        standings_text = "\n".join(
-            filter(None, [
-                "📈 Standings Update:",
-                leader_line,
-                
-                chase_lines,
-                
-                relegation_lines,
-                
-                threatened_lines,
-            ])
-        )
-
-    # Combine everything into a full message
-    return "\n\n".join([results_text, performers_text, standings_text])
+    return summary.strip()
 
 def normalize(text):
     return unidecode.unidecode(text.strip().lower())
@@ -628,7 +580,7 @@ def groupme_webhook():
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
         standings = scrape_league_standings(league_url)
-        standings_summary = summarize_standings(league_url)
+        standings_summary = summarize_standings(standings)
 
         final_message = (
             f"📋 **{text.strip()}**\n\n"
