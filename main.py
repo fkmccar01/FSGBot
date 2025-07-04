@@ -399,6 +399,10 @@ def get_match_summary_and_grades(game_id):
         return summary, player_grades, match_data
 
 def scrape_league_standings(league_url):
+    import sys
+    import requests
+    from bs4 import BeautifulSoup
+
     with requests.Session() as session:
         response = session.get(league_url)
         if response.status_code != 200:
@@ -414,16 +418,17 @@ def scrape_league_standings(league_url):
         standings = []
         rows = standings_table.find_all("tr")[1:]  # Skip header
 
+        def safe_int(text):
+            try:
+                return int(text)
+            except Exception:
+                return None
+
         for row in rows:
             cells = row.find_all("td")
             if len(cells) < 10:
+                sys.stderr.write(f"⚠️ Skipping row with missing columns: {row}\n")
                 continue
-
-            def safe_int(text):
-                try:
-                    return int(text)
-                except Exception:
-                    return None
 
             place = cells[0].text.strip()
             team_tag = cells[2].find("a")
@@ -433,11 +438,22 @@ def scrape_league_standings(league_url):
             wins = safe_int(cells[4].text.strip())
             draws = safe_int(cells[5].text.strip())
             losses = safe_int(cells[6].text.strip())
+            
+            # Parse goals for and against from "X - Y" string
+            goals_text = cells[7].text.strip()
+            goals_for, goals_against = None, None
+            if "-" in goals_text:
+                parts = goals_text.split("-")
+                if len(parts) == 2:
+                    goals_for = safe_int(parts[0].strip())
+                    goals_against = safe_int(parts[1].strip())
+            
             goal_diff = safe_int(cells[8].text.strip())
             points = safe_int(cells[9].text.strip())
 
-            # Skip rows with missing critical info
-            if None in [games_played, wins, draws, losses, goal_diff, points]:
+            # Skip rows missing any critical data
+            critical_values = [games_played, wins, draws, losses, goals_for, goals_against, goal_diff, points]
+            if any(v is None for v in critical_values):
                 sys.stderr.write(f"⚠️ Skipping row with missing data: {row}\n")
                 continue
 
@@ -448,6 +464,8 @@ def scrape_league_standings(league_url):
                 "wins": wins,
                 "draws": draws,
                 "losses": losses,
+                "goals_for": goals_for,
+                "goals_against": goals_against,
                 "goal_diff": goal_diff,
                 "points": points
             })
