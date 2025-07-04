@@ -533,16 +533,18 @@ def groupme_webhook():
             return "ok", 200
 
         match_scores = []
-        summaries = []
         top_players = []
 
         for match in matches:
-            summary, player_grades, match_data = get_match_summary_and_grades(match["game_id"])
-            summaries.append(summary)
-        
+            match_html = scrape_match_html(requests.Session(), f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
+            soup = BeautifulSoup(match_html, "html.parser")
+            match_data = parse_match_data(soup)
+
             score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
             match_scores.append(score_line)
-
+        
+            # Extract player grades (if available)
+            player_grades = match_data.get("player_grades", [])
             if player_grades:
                 top_player = sorted([p for p in player_grades if p["grade"]], key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
