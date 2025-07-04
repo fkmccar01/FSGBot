@@ -516,15 +516,15 @@ def groupme_webhook():
 
     # Recap or update requests for leagues
     if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]):
-    if "goondesliga" in text_lower:
-        league_url = GOONDESLIGA_URL
-        send_groupme_message("Working on your Goondesliga recap... 📝")
-    elif "spoondesliga" in text_lower:
-        league_url = SPOONDESLIGA_URL
-        send_groupme_message("Working on your Spoondesliga recap... 📝")
-    else:
-        send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
-        return "ok", 200
+        if "goondesliga" in text_lower:
+            league_url = GOONDESLIGA_URL
+            send_groupme_message("Working on your Goondesliga recap... 📝")
+        elif "spoondesliga" in text_lower:
+            league_url = SPOONDESLIGA_URL
+            send_groupme_message("Working on your Spoondesliga recap... 📝")
+        else:
+            send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
+            return "ok", 200
 
     if not league_url:
         send_groupme_message("Sorry, I couldn’t find the league URL.")
