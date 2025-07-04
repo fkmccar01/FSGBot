@@ -514,46 +514,40 @@ def groupme_webhook():
 
     text_lower = text.lower()
 
-    # Recap or update requests for leagues
+    # 🟢 1. Handle League Recap Requests
     if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]):
         if "goondesliga" in text_lower:
             league_url = GOONDESLIGA_URL
             send_groupme_message("Working on your Goondesliga recap... 📝")
+            matches = get_latest_game_ids_from_league(league_url)
         elif "spoondesliga" in text_lower:
             league_url = SPOONDESLIGA_URL
             send_groupme_message("Working on your Spoondesliga recap... 📝")
+            matches = get_latest_game_ids_from_league(league_url)
         else:
             send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
             return "ok", 200
 
-    if not league_url:
-        send_groupme_message("Sorry, I couldn’t find the league URL.")
-        return "ok", 200
-
-    matches = get_latest_game_ids_from_league(league_url)
-    if not matches:
-        send_groupme_message("Sorry, I couldn’t find recent matches for this league.")
-        return "ok", 200
+        if not matches:
+            send_groupme_message("Sorry, I couldn't find any recent matches in that league.")
+            return "ok", 200
 
         match_scores = []
         summaries = []
         top_players = []
-        
+
         for match in matches:
             summary, player_grades = get_match_summary_and_grades(match["game_id"])
             summaries.append(summary)
-        
-            # Build match score line
+
             match_data = parse_match_data(BeautifulSoup(scrape_match_html(requests.Session(), f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2"), "html.parser"))
             score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
             match_scores.append(score_line)
-        
-            # Get top player formatted like (Position, Grade 📊)
+
             if player_grades:
                 top_player = sorted([p for p in player_grades if p["grade"]], key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
-        summary_text = "\n\n".join(summaries)
         standings = scrape_league_standings(league_url)
         standings_summary = summarize_standings(standings)
 
@@ -561,38 +555,33 @@ def groupme_webhook():
             f"📋 **{text.strip()}**\n\n"
             f"⚽ **Match Results:**\n" + "\n".join(match_scores) + "\n\n"
             f"📊 Top performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
-            "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
             f"📈 **Standings Update:**\n{standings_summary}"
         )
 
-        send_groupme_message(final_message[:1500])  # Increased limit
-
+        send_groupme_message(final_message[:1500])
         return "ok", 200
-    
-    # Detect "highlights of the ___ match"
-    if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["highlight", "recap"]):
+
+    # 🟠 2. Handle Specific Team Match Recap
+    if "fsgbot" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
         team_query = normalize(text)
-    
-        # List of league URLs to check
+
         league_urls = [
-            os.environ.get("GOONDESLIGA_URL"),
-            os.environ.get("SPOONDESLIGA_URL")
+            GOONDESLIGA_URL,
+            SPOONDESLIGA_URL
         ]
 
         for league_url in league_urls:
             if not league_url:
                 continue
-    
+
             matches = get_latest_game_ids_from_league(league_url)
-            for m in matches:
-                home_normal = normalize(m["home_team"])
-                away_normal = normalize(m["away_team"])
-    
-                if home_normal in team_query or away_normal in team_query:
-                    summary = scrape_and_summarize_by_game_id(m["game_id"])
+            for match in matches:
+                if normalize(match["home_team"]) in team_query or normalize(match["away_team"]) in team_query:
+                    summary = scrape_and_summarize_by_game_id(match["game_id"])
                     send_groupme_message(summary)
                     return "ok", 200
 
+    # 🔴 Fallback
     send_groupme_message("Sorry, I couldn’t find a recent match for any team in your message.")
     return "ok", 200
 
