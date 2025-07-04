@@ -399,79 +399,50 @@ def get_match_summary_and_grades(game_id):
         summary = call_gemini_api(prompt)
         return summary, player_grades, match_data
 
-def scrape_league_standings(league_url):
-    import sys
-    import requests
+def scrape_league_standings(html):
     from bs4 import BeautifulSoup
 
-    with requests.Session() as session:
-        response = session.get(league_url)
-        if response.status_code != 200:
-            sys.stderr.write(f"⚠️ Failed to fetch league standings: {response.status_code}\n")
-            return []
+    soup = BeautifulSoup(html, "html.parser")
+    standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
+    if not standings_table:
+        raise ValueError("Standings table not found.")
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
-        if not standings_table:
-            sys.stderr.write("⚠️ Could not find standings table.\n")
-            return []
+    rows = standings_table.find_all("tr")[1:]  # skip header
+    standings = []
 
-        standings = []
-        rows = standings_table.find_all("tr")[1:]  # Skip header
+    for row in rows:
+        cols = row.find_all("td")
+        if len(cols) < 10:
+            continue  # skip malformed rows
 
-        def safe_int(text):
-            try:
-                return int(text)
-            except Exception:
-                return None
-
-        for row in rows:
-            cells = row.find_all("td")
-            if len(cells) < 10:
-                sys.stderr.write(f"⚠️ Skipping row with missing columns: {row}\n")
-                continue
-
-            place = cells[0].text.strip()
-            team_tag = cells[2].find("a")
-            team_name = team_tag.text.strip() if team_tag else "Unknown"
-
-            games_played = safe_int(cells[3].text.strip())
-            wins = safe_int(cells[4].text.strip())
-            draws = safe_int(cells[5].text.strip())
-            losses = safe_int(cells[6].text.strip())
-            
-            # Parse goals for and against from "X - Y" string
-            goals_text = cells[7].text.strip()
-            goals_for, goals_against = None, None
-            if "-" in goals_text:
-                parts = goals_text.split("-")
-                if len(parts) == 2:
-                    goals_for = safe_int(parts[0].strip())
-                    goals_against = safe_int(parts[1].strip())
-            
-            goal_diff = safe_int(cells[8].text.strip())
-            points = safe_int(cells[9].text.strip())
-
-            # Skip rows missing any critical data
-            critical_values = [games_played, wins, draws, losses, goals_for, goals_against, goal_diff, points]
-            if any(v is None for v in critical_values):
-                sys.stderr.write(f"⚠️ Skipping row with missing data: {row}\n")
-                continue
+        try:
+            place = cols[0].text.strip()
+            team_link = cols[2].find("a")
+            team_name = team_link.text.strip() if team_link else "Unknown"
+            games_played = cols[3].text.strip()
+            wins = cols[4].text.strip()
+            draws = cols[5].text.strip()
+            losses = cols[6].text.strip()
+            goals_for_against = cols[7].text.strip()
+            goal_diff = cols[8].text.strip()
+            points = cols[9].text.strip()
 
             standings.append({
-                "place": safe_int(place) or 0,
-                "name": team_name,
-                "games_played": games_played,
-                "wins": wins,
-                "draws": draws,
-                "losses": losses,
-                "goals_for": goals_for,
-                "goals_against": goals_against,
-                "goal_diff": goal_diff,
-                "points": points
+                "place": int(place),
+                "team": team_name,
+                "games": int(games_played),
+                "wins": int(wins),
+                "draws": int(draws),
+                "losses": int(losses),
+                "gf_ga": goals_for_against,
+                "gd": int(goal_diff),
+                "points": int(points),
             })
+        except Exception as e:
+            print(f"Skipping row due to error: {e}")
+            continue
 
-        return standings
+    return standings
 
 def summarize_league(league_url):
     send_groupme_message("Working on your recap... 📝")
