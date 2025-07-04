@@ -456,50 +456,47 @@ def groupme_webhook():
     if sender_type == "bot":
         return "Ignoring bot message"
 
-    # Detect full league recap requests
-if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["recap", "update"]):
-    if "goondesliga" in text.lower():
-        send_groupme_message("Working on your Goondesliga recap... 📝")
-        league_url = os.environ.get("GOONDESLIGA_URL")
-    elif "spoondesliga" in text.lower():
-        send_groupme_message("Working on your Spoondesliga recap... 📝")
-        league_url = os.environ.get("SPOONDESLIGA_URL")
-    else:
-        send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
+    # ✅ Everything below here must be inside the function
+    if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["recap", "update"]):
+        if "goondesliga" in text.lower():
+            send_groupme_message("Working on your Goondesliga recap... 📝")
+            league_url = os.environ.get("GOONDESLIGA_URL")
+        elif "spoondesliga" in text.lower():
+            send_groupme_message("Working on your Spoondesliga recap... 📝")
+            league_url = os.environ.get("SPOONDESLIGA_URL")
+        else:
+            send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
+            return "ok", 200
+
+        if not league_url:
+            send_groupme_message("Sorry, I couldn’t find the league URL.")
+            return "ok", 200
+
+        matches = get_latest_game_ids_from_league(league_url)
+        summaries = []
+        top_players = []
+
+        for match in matches:
+            result = scrape_and_summarize_by_game_id(match["game_id"])
+            summaries.append(result)
+
+            motm = result.split(" (")[0]
+            top_players.append(motm)
+
+        summary_text = "\n\n".join(summaries)
+        standings = scrape_league_standings(league_url)
+        standings_summary = summarize_standings(standings)
+
+        final_message = (
+            f"📋 **{text.strip()}**\n\n"
+            f"⚽ **Match Summaries:**\n{summary_text}\n\n"
+            f"📊 Top performers:\n" +
+            "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
+            f"📈 **Standings Update:**\n{standings_summary}"
+        )
+
+        send_groupme_message(final_message[:1000])
         return "ok", 200
-
-    if not league_url:
-        send_groupme_message("Sorry, I couldn’t find the league URL.")
-        return "ok", 200
-
-    matches = get_latest_game_ids_from_league(league_url)
-    summaries = []
-    top_players = []
-
-    for match in matches:
-        result = scrape_and_summarize_by_game_id(match["game_id"])
-        summaries.append(result)
-
-        # extract top-rated player from each match (based on your player_grades if needed)
-        # for now, we just pull MoTM name as placeholder
-        motm = result.split(" (")[0]  # crude, you can refine
-        top_players.append(motm)
-
-    summary_text = "\n\n".join(summaries)
-    standings = scrape_league_standings(league_url)
-    standings_summary = summarize_standings(standings)
-
-    # Format output
-    final_message = (
-        f"📋 **{text.strip()}**\n\n"
-        f"⚽ **Match Summaries:**\n{summary_text}\n\n"
-        f"📊 Top performers:\n" +
-        "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
-        f"📈 **Standings Update:**\n{standings_summary}"
-    )
-
-    send_groupme_message(final_message[:1000])  # avoid GroupMe character limit
-    return "ok", 200
     
     # Detect "highlights of the ___ match"
     if "fsgbot" in text.lower() and any(keyword in text.lower() for keyword in ["highlight", "recap"]):
