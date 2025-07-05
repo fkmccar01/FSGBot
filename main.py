@@ -4,6 +4,8 @@ import os
 import sys
 import requests
 import json
+with open("profiles.json", "r") as f:
+    PROFILES = json.load(f)
 from bs4 import BeautifulSoup
 from flask import Flask, request
 
