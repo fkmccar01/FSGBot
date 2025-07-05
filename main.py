@@ -532,10 +532,10 @@ def groupme_webhook():
     if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
         if "goondesliga" in text_lower:
             league_url = GOONDESLIGA_URL
-            send_groupme_message("Working on your Goondesliga recap... 📝")
+            send_groupme_message("Alright y'all! Taycan A. giving you an update on the Goondesliga...")
         elif "spoondesliga" in text_lower:
             league_url = SPOONDESLIGA_URL
-            send_groupme_message("Working on your Spoondesliga recap... 📝")
+            send_groupme_message("Alright y'all! Taycan A. giving you an update on the Spoondesliga...")
         else:
             send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
             return "ok", 200
