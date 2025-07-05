@@ -400,58 +400,38 @@ def get_match_summary_and_grades(game_id):
 import sys  # Make sure this is imported at the top
 
 def scrape_league_standings(league_url):
-    response = requests.get(league_url)
-    if response.status_code != 200:
-        raise Exception(f"Failed to load standings page: {response.status_code}")
+    import requests
+    from bs4 import BeautifulSoup
 
+    response = requests.get(league_url)
     soup = BeautifulSoup(response.text, "html.parser")
+
     standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
     if not standings_table:
         raise ValueError("Standings table not found.")
 
-    rows = standings_table.find_all("tr")
-    print(f"🧪 Found {len(rows)} rows in the standings table.")
-    
+    rows = standings_table.find_all("tr")[1:]  # Skip header row
     standings = []
 
     for idx, row in enumerate(rows):
         cols = row.find_all("td")
         if len(cols) < 10:
-            print(f"⚠️ Skipping row {idx + 1} — not enough columns.")
-            continue
+            continue  # skip malformed rows
 
         try:
             place = int(cols[0].get_text(strip=True))
-            team_cell = cols[2]
-            team_link = team_cell.find("a")
-            team_name = team_link.get_text(strip=True) if team_link else team_cell.get_text(strip=True)
-
-            games_played = int(cols[3].get_text(strip=True))
-            wins = int(cols[4].get_text(strip=True))
-            draws = int(cols[5].get_text(strip=True))
-            losses = int(cols[6].get_text(strip=True))
-            gf_ga = cols[7].get_text(strip=True)
-            gd = int(cols[8].get_text(strip=True))
+            team_link = cols[2].find("a")
+            team_name = team_link.get_text(strip=True) if team_link else "Unknown"
             points = int(cols[9].get_text(strip=True))
 
             standings.append({
                 "place": place,
                 "team": team_name,
-                "games": games_played,
-                "wins": wins,
-                "draws": draws,
-                "losses": losses,
-                "gf_ga": gf_ga,
-                "gd": gd,
-                "points": points,
+                "points": points
             })
         except Exception as e:
-            print(f"⚠️ Skipping row {idx + 1} due to error: {e}")
+            print(f"⚠️ Error parsing row {idx + 1}: {e}")
             continue
-
-    print(f"✅ Parsed {len(standings)} teams from standings table.")
-    for team in standings:
-        print(f"- {team['team']} ({team['points']} pts)")
 
     return standings
 
