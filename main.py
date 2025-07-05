@@ -20,7 +20,7 @@ SPOONDESLIGA_URL = os.environ.get("SPOONDESLIGA_URL")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 with open("profiles.json", "r") as f:
-    PROFILES = json.load(f)
+    profiles = json.load(f)
 
 def build_team_name_mapping(profiles):
     mapping = {}
