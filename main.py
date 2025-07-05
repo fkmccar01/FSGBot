@@ -28,17 +28,17 @@ def build_team_name_mapping(profiles):
         team = profile.get("team")
         aliases = profile.get("team_alias", [])
         if team:
-            mapping[team.lower()] = team
+            mapping[normalize(team.lower())] = team
             for alias in aliases:
-                mapping[alias.lower()] = team
+                mapping[normalize(alias.lower())] = team
     return mapping
 
 team_mapping = build_team_name_mapping(profiles)
 
 def resolve_team_name(text, team_mapping):
-    text = text.lower()
+    text = text.strip().lower()
     for alias, official_name in team_mapping.items():
-        if alias in text:
+        if alias in normalize(text):
             return official_name
     return None
 
