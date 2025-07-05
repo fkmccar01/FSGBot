@@ -455,7 +455,7 @@ print(f"\n✅ Total parsed teams: {len(standings)}")
 for team in standings:
     print(f"- {team['team']} ({team['points']} pts)")
 
-    return standings
+        return standings
 
 def summarize_league(league_url):
     send_groupme_message("Working on your recap... 📝")
