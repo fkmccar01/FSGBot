@@ -398,20 +398,11 @@ def get_match_summary_and_grades(game_id):
         return summary, player_grades, match_data
 
 def scrape_league_standings(league_url):
-    # Download the HTML from the URL
     response = requests.get(league_url)
     if response.status_code != 200:
         raise Exception(f"Failed to load standings page: {response.status_code}")
 
-    html = response.text
-    soup = BeautifulSoup(html, "html.parser")
-
-print(f"\n🛠️ DEBUG: Raw table has {len(rows)} rows")
-
-for idx, row in enumerate(rows):
-    cols = row.find_all("td")
-    print(f"Row {idx + 1}: {len(cols)} columns")
-
+    soup = BeautifulSoup(response.text, "html.parser")
     standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
     if not standings_table:
         raise ValueError("Standings table not found.")
@@ -419,8 +410,10 @@ for idx, row in enumerate(rows):
     rows = standings_table.find_all("tr")[1:]  # skip header
     standings = []
 
-    for row in rows:
+    for idx, row in enumerate(rows):
         cols = row.find_all("td")
+        print(f"Row {idx + 1}: {len(cols)} columns")
+
         if len(cols) < 10:
             continue
 
@@ -454,6 +447,7 @@ for idx, row in enumerate(rows):
     print(f"\n✅ Total parsed teams: {len(standings)}")
     for team in standings:
         print(f"- {team['team']} ({team['points']} pts)")
+
     return standings
 
 def summarize_league(league_url):
