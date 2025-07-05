@@ -590,19 +590,19 @@ def groupme_webhook():
 
     # 🟠 2. Handle Specific Team Match Recap
     if "fsgbot" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
-        resolved_team = resolve_team_name(text, team_mapping)
-        if not resolved_team:
-            return "ok", 200  # No team match, ignore
-        
-            league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
-        
-            for league_url in league_urls:
-                matches = get_latest_game_ids_from_league(league_url)
-                for match in matches:
-                    if normalize(match["home_team"]) == normalize(resolved_team) or normalize(match["away_team"]) == normalize(resolved_team):
-                        summary = scrape_and_summarize_by_game_id(match["game_id"])
-                        send_groupme_message(summary)
-                        return "ok", 200
+    resolved_team = resolve_team_name(text, team_mapping)
+    if not resolved_team:
+        return "ok", 200  # No team match, ignore
+
+    league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
+
+    for league_url in league_urls:
+        matches = get_latest_game_ids_from_league(league_url)
+        for match in matches:
+            if normalize(match["home_team"]) == normalize(resolved_team) or normalize(match["away_team"]) == normalize(resolved_team):
+                summary = scrape_and_summarize_by_game_id(match["game_id"])
+                send_groupme_message(summary)
+                return "ok", 200
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
