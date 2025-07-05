@@ -482,7 +482,7 @@ def summarize_league(league_url):
 
 def summarize_standings(standings):
     if len(standings) < 7:
-    return "📈 **Standings Update:**\nNot enough teams in the league to determine relegation or chase pack."
+        return "📈 **Standings Update:**\nNot enough teams in the league to determine relegation or chase pack."
 
     leader = standings[0]
     sixth_place_points = standings[5]["points"]
