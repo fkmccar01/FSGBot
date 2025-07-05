@@ -418,16 +418,15 @@ def scrape_league_standings_with_login(session, league_url):
         cols = row.find_all("td")
         if len(cols) < 10:
             continue
-        # Debug print to see all columns content for this row
-        print([col.text.strip() for col in cols])
-        # Then try to parse with the right column indexes:
+        # Debug print all columns for this row
+        print("STANDINGS ROW COLS:", [col.text.strip() for col in cols])
         try:
             place = int(cols[0].text.strip().strip("."))
             team_link = cols[2].find("a")
             team_name = team_link.text.strip() if team_link else "Unknown"
-    
-            # From print, check which col is "Diff" (goal difference) — probably cols[7]
-            diff_text = cols[7].text.strip().replace("+", "")
+            
+            # Replace col index 8 with correct col after inspecting print output
+            diff_text = cols[7].text.strip().replace("+", "")  # Try 7 instead of 8
             diff = int(diff_text)
     
             points = int(cols[9].text.strip())
