@@ -22,6 +22,15 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini
 with open("profiles.json", "r") as f:
     profiles = json.load(f)
 
+def normalize(text):
+    """Lowercases, removes accents, and strips special characters for reliable comparison."""
+    if not text:
+        return ""
+    text = unicodedata.normalize('NFKD', text)
+    text = text.encode('ASCII', 'ignore').decode('utf-8')
+    text = re.sub(r'[^a-z0-9 ]+', '', text.lower())
+    return text.strip()
+
 def build_team_name_mapping(profiles):
     mapping = {}
     for profile in profiles.values():
