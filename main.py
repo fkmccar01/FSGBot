@@ -17,6 +17,8 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 GOONDESLIGA_URL = os.environ.get("GOONDESLIGA_URL")
 SPOONDESLIGA_URL = os.environ.get("SPOONDESLIGA_URL")
 
+bot_aliases = ["@taycan a. schitt", "@taycan a schitt", "taycan", "taycan a"]
+
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 with open("profiles.json", "r") as f:
@@ -527,7 +529,7 @@ def groupme_webhook():
     text_lower = text.lower()
 
     # 🟢 1. Handle League Recap Requests
-    if "@taycan a. schitt" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
+    if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
         if "goondesliga" in text_lower:
             league_url = GOONDESLIGA_URL
             send_groupme_message("Working on your Goondesliga recap... 📝")
@@ -591,7 +593,7 @@ def groupme_webhook():
         return "ok", 200
 
     # 🟠 2. Handle Specific Team Match Recap
-    if "@taycan a. schitt" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
+    if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["highlight", "recap"]):
         resolved_team = resolve_team_name(text, team_mapping)
         if not resolved_team:
             return "ok", 200  # No team match, ignore
