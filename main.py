@@ -419,14 +419,17 @@ def scrape_league_standings_with_login(session, league_url):
         if len(cols) < 10:
             continue
         try:
-            place = int(cols[0].text.strip())
+            place = int(cols[0].text.strip().strip("."))
             team_link = cols[2].find("a")
             team_name = team_link.text.strip() if team_link else "Unknown"
-            points = int(cols[9].text.strip())
+            gd = int(cols[8].text.strip())     # ✅ Goal difference (Diff)
+            points = int(cols[9].text.strip()) # ✅ Points column
+
             standings.append({
                 "place": place,
                 "team": team_name,
-                "points": points
+                "points": points,
+                "gd": gd
             })
         except Exception as e:
             sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
