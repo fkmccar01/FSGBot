@@ -1,3 +1,4 @@
+
 import unidecode
 import os
 import sys
@@ -471,7 +472,23 @@ def normalize(text):
 def index():
     return "FSGBot is alive!"
 
-# 🟢 1. Handle League Recap Requests
+@app.route("/webhook", methods=["POST"])
+def groupme_webhook():
+    data = request.get_json()
+    sys.stderr.write(f"Webhook data received: {data}\n")
+
+    if not data:
+        return "No data received", 400
+
+    text = data.get("text", "")
+    sender_type = data.get("sender_type", "")
+
+    if sender_type == "bot":
+        return "Ignoring bot message"
+
+    text_lower = text.lower()
+
+    # 🟢 1. Handle League Recap Requests
 if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
     if "goondesliga" in text_lower:
         league_url = GOONDESLIGA_URL
