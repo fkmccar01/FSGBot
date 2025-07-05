@@ -397,6 +397,8 @@ def get_match_summary_and_grades(game_id):
         summary = call_gemini_api(prompt)
         return summary, player_grades, match_data
 
+import sys  # Make sure this is imported at the top
+
 def scrape_league_standings(league_url):
     response = requests.get(league_url)
     if response.status_code != 200:
@@ -408,13 +410,16 @@ def scrape_league_standings(league_url):
         raise ValueError("Standings table not found.")
 
     rows = standings_table.find_all("tr")[1:]  # skip header
+    sys.stderr.write(f"\n🧪 Found {len(rows)} rows in the standings table.\n")
+
     standings = []
 
     for idx, row in enumerate(rows):
         cols = row.find_all("td")
-        print(f"Row {idx + 1}: {len(cols)} columns")
+        sys.stderr.write(f"Row {idx + 1}: {len(cols)} columns\n")
 
         if len(cols) < 10:
+            sys.stderr.write(f"⚠️ Skipping row {idx + 1} — not enough columns.\n")
             continue
 
         try:
@@ -441,18 +446,18 @@ def scrape_league_standings(league_url):
                 "points": int(points),
             })
         except Exception as e:
-            print(f"Skipping row due to error: {e}")
+            sys.stderr.write(f"⚠️ Skipping row {idx + 1} due to error: {e}\n")
             continue
 
-    print(f"\n✅ Total parsed teams: {len(standings)}")
+    sys.stderr.write(f"\n✅ Parsed {len(standings)} teams from standings table.\n")
     for team in standings:
-        print(f"- {team['team']} ({team['points']} pts)")
+        sys.stderr.write(f"🔢 {team['place']}. {team['team']} — {team['points']} pts\n")
 
     return standings
 
 def summarize_standings(standings):
     if len(standings) < 7:
-        return "📈 **Standings Update:**\nNot enough teams in the league to determine relegation or chase pack."
+        return "Not enough teams in the league to determine relegation or chase pack."
 
     leader = standings[0]
     sixth_place_points = standings[5]["points"]
