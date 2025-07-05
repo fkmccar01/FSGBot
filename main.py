@@ -409,49 +409,53 @@ def scrape_league_standings(league_url):
     if not standings_table:
         raise ValueError("Standings table not found.")
 
-    rows = standings_table.find_all("tr")[1:]  # skip header
-    sys.stderr.write(f"\n🧪 Found {len(rows)} rows in the standings table.\n")
-
+    rows = standings_table.find_all("tr")
     standings = []
+    print(f"🧪 Found {len(rows)} rows in the standings table.")
 
     for idx, row in enumerate(rows):
         cols = row.find_all("td")
-        sys.stderr.write(f"Row {idx + 1}: {len(cols)} columns\n")
+        print(f"Row {idx + 1}: {len(cols)} columns")
 
         if len(cols) < 10:
-            sys.stderr.write(f"⚠️ Skipping row {idx + 1} — not enough columns.\n")
+            print(f"⚠️ Skipping row {idx + 1} — not enough columns.")
             continue
 
         try:
-            place = cols[0].text.strip()
-            team_link = cols[2].find("a")
+            place = int(cols[0].text.strip())
+
+            # Team name is buried inside a nested table
+            team_cell = cols[2]
+            team_link = team_cell.find("a")
             team_name = team_link.text.strip() if team_link else "Unknown"
-            games_played = cols[3].text.strip()
-            wins = cols[4].text.strip()
-            draws = cols[5].text.strip()
-            losses = cols[6].text.strip()
-            goals_for_against = cols[7].text.strip()
-            goal_diff = cols[8].text.strip()
-            points = cols[9].text.strip()
+
+            games_played = int(cols[3].text.strip())
+            wins = int(cols[4].text.strip())
+            draws = int(cols[5].text.strip())
+            losses = int(cols[6].text.strip())
+            gf_ga = cols[7].text.strip()
+            goal_diff = int(cols[8].text.strip())
+            points = int(cols[9].text.strip())
 
             standings.append({
-                "place": int(place),
+                "place": place,
                 "team": team_name,
-                "games": int(games_played),
-                "wins": int(wins),
-                "draws": int(draws),
-                "losses": int(losses),
-                "gf_ga": goals_for_against,
-                "gd": int(goal_diff),
-                "points": int(points),
+                "games": games_played,
+                "wins": wins,
+                "draws": draws,
+                "losses": losses,
+                "gf_ga": gf_ga,
+                "gd": goal_diff,
+                "points": points,
             })
+
         except Exception as e:
-            sys.stderr.write(f"⚠️ Skipping row {idx + 1} due to error: {e}\n")
+            print(f"⚠️ Skipping row {idx + 1} due to error: {e}")
             continue
 
-    sys.stderr.write(f"\n✅ Parsed {len(standings)} teams from standings table.\n")
+    print(f"✅ Parsed {len(standings)} teams from standings table.")
     for team in standings:
-        sys.stderr.write(f"🔢 {team['place']}. {team['team']} — {team['points']} pts\n")
+        print(f"- {team['team']} ({team['points']} pts)")
 
     return standings
 
