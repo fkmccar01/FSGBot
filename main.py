@@ -489,66 +489,66 @@ def groupme_webhook():
     text_lower = text.lower()
 
     # 🟢 1. Handle League Recap Requests
-if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
-    if "goondesliga" in text_lower:
-        league_url = GOONDESLIGA_URL
-        send_groupme_message("Working on your Goondesliga recap... 📝")
-    elif "spoondesliga" in text_lower:
-        league_url = SPOONDESLIGA_URL
-        send_groupme_message("Working on your Spoondesliga recap... 📝")
-    else:
-        send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
+    if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
+        if "goondesliga" in text_lower:
+            league_url = GOONDESLIGA_URL
+            send_groupme_message("Working on your Goondesliga recap... 📝")
+        elif "spoondesliga" in text_lower:
+            league_url = SPOONDESLIGA_URL
+            send_groupme_message("Working on your Spoondesliga recap... 📝")
+        else:
+            send_groupme_message("Please specify which league you want a recap of (Goondesliga or Spoondesliga).")
+            return "ok", 200
+    
+        matches = get_latest_game_ids_from_league(league_url)
+        if not matches:
+            send_groupme_message("Sorry, I couldn't find any recent matches in that league.")
+            return "ok", 200
+    
+        session = get_logged_in_session()
+        if not session:
+            send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
+            return "ok", 200
+    
+        match_scores = []
+        top_players = []
+    
+        for match in matches:
+            match_html = scrape_match_html(session, f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
+            if not match_html:
+                sys.stderr.write(f"⚠️ Failed to retrieve match page for game {match['game_id']}\n")
+                continue
+    
+            soup = BeautifulSoup(match_html, "html.parser")
+            match_data = parse_match_data(soup)
+            player_grades = parse_player_grades(soup)
+    
+            score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
+            match_scores.append(score_line)
+    
+            rated_players = [p for p in player_grades if p["grade"] is not None]
+            if rated_players:
+                top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
+                top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
+    
+        # Use the logged-in session to scrape standings
+        standings = scrape_league_standings_with_login(session, league_url)
+    
+        try:
+            standings_summary = generate_standings_summary(standings)
+        except Exception as e:
+            sys.stderr.write(f"⚠️ Error parsing standings: {e}\n")
+            standings_summary = "Standings data is missing."
+    
+        final_message = (
+            f"📋 **{text.strip()}**\n\n"
+            f"⚽ **Match Results:**\n" + "\n".join(match_scores) + "\n\n"
+            f"📊 Top performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
+            f"📈 **Standings Update:**\n{standings_summary}"
+        )
+    
+        send_groupme_message(final_message[:1500])
         return "ok", 200
-
-    matches = get_latest_game_ids_from_league(league_url)
-    if not matches:
-        send_groupme_message("Sorry, I couldn't find any recent matches in that league.")
-        return "ok", 200
-
-    session = get_logged_in_session()
-    if not session:
-        send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
-        return "ok", 200
-
-    match_scores = []
-    top_players = []
-
-    for match in matches:
-        match_html = scrape_match_html(session, f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
-        if not match_html:
-            sys.stderr.write(f"⚠️ Failed to retrieve match page for game {match['game_id']}\n")
-            continue
-
-        soup = BeautifulSoup(match_html, "html.parser")
-        match_data = parse_match_data(soup)
-        player_grades = parse_player_grades(soup)
-
-        score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
-        match_scores.append(score_line)
-
-        rated_players = [p for p in player_grades if p["grade"] is not None]
-        if rated_players:
-            top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
-            top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
-
-    # Use the logged-in session to scrape standings
-    standings = scrape_league_standings_with_login(session, league_url)
-
-    try:
-        standings_summary = generate_standings_summary(standings)
-    except Exception as e:
-        sys.stderr.write(f"⚠️ Error parsing standings: {e}\n")
-        standings_summary = "Standings data is missing."
-
-    final_message = (
-        f"📋 **{text.strip()}**\n\n"
-        f"⚽ **Match Results:**\n" + "\n".join(match_scores) + "\n\n"
-        f"📊 Top performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
-        f"📈 **Standings Update:**\n{standings_summary}"
-    )
-
-    send_groupme_message(final_message[:1500])
-    return "ok", 200
 
     # 🟠 2. Handle Specific Team Match Recap
     if "fsgbot" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
