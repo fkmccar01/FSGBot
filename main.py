@@ -481,39 +481,44 @@ def summarize_league(league_url):
     return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
 
 def summarize_standings(standings):
-    if len(standings) < 4:
-        return "Not enough teams in the league to determine relegation or chase pack."
+    if len(standings) < 7:
+    return "📈 **Standings Update:**\nNot enough teams in the league to determine relegation or chase pack."
 
     leader = standings[0]
-    leader_points = int(leader["points"])
-    sixth_place_points = int(standings[5]["points"]) if len(standings) > 5 else 0
+    sixth_place_points = standings[5]["points"]
+    relegation_zone = standings[5:]  # 6th and 7th place
+    chase_pack = []
 
-    chasing_teams = []
-    relegation_threat = []
+    # Find teams within 6 points of the leader (excluding the leader)
+    for team in standings[1:]:
+        if leader["points"] - team["points"] <= 6:
+            chase_pack.append(team)
 
-    for i, team in enumerate(standings[1:], start=1):  # skip leader
-        points = int(team["points"])
-        if points >= leader_points - 6:
-            chasing_teams.append(team)
-        if i >= 5 and points <= sixth_place_points + 4:
-            relegation_threat.append(team)
+    # Find teams within 4 points of 6th place (but not already 6th or 7th)
+    danger_zone = []
+    for team in standings[:5]:  # Only check places 1–5
+        if team["points"] <= sixth_place_points + 4:
+            danger_zone.append(team)
 
-    summary = f"🏆 Current leader: {leader['team']} with {leader['points']} points.\n"
-
-    if chasing_teams:
-        summary += "\n💥 Chasing pack:\n"
-        for team in chasing_teams:
+    summary = f"📈 **Standings Update:**\n"
+    summary += f"🏆 Leader: {leader['team']} ({leader['points']} pts)\n"
+    
+    if chase_pack:
+        summary += "📣 Teams chasing the title:\n"
+        for team in chase_pack:
             summary += f"- {team['team']} ({team['points']} pts)\n"
-
-    summary += "\n⚠️ Relegation danger zone:\n"
-    if len(standings) >= 4:
-        summary += f"- 7th: {standings[6]['team']} ({standings[7]['points']} pts)\n"
-        summary += f"- 6th: {standings[5]['team']} ({standings[6]['points']} pts)\n"
-    for team in relegation_threat:
-        if team not in standings[4:6]:  # avoid repeating 6th/7th
+    
+    if relegation_zone:
+        summary += "⚠️ Relegation zone:\n"
+        for team in relegation_zone:
             summary += f"- {team['team']} ({team['points']} pts)\n"
-
-    return summary.strip()
+    
+    if danger_zone:
+        summary += "🚨 At risk of relegation:\n"
+        for team in danger_zone:
+            summary += f"- {team['team']} ({team['points']} pts)\n"
+    
+    return summary
 
 def normalize(text):
     return unidecode.unidecode(text.strip().lower())
