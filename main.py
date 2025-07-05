@@ -553,9 +553,13 @@ def groupme_webhook():
                 top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
-        standings = scrape_league_standings(league_url)
-        print("📊 Standings before summary:", standings)
-        standings_summary = generate_standings_summary(standings)
+        try:
+            standings = scrape_league_standings(league_url)
+            print(f"📊 Standings before summary: {standings}")
+            standings_summary = generate_standings_summary(standings)
+        except Exception as e:
+            sys.stderr.write(f"⚠️ Error parsing standings: {e}\n")
+            standings_summary = "Standings data is missing."
 
         final_message = (
             f"📋 **{text.strip()}**\n\n"
