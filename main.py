@@ -459,42 +459,37 @@ def scrape_league_standings(league_url):
 
     return standings
 
-def summarize_standings(standings):
-    if not standings or len(standings) < 2:
-        return "Not enough teams in the league to determine relegation or chase pack."
+def generate_standings_summary(standings):
+    if not standings:
+        return "Standings data is missing."
 
     standings = sorted(standings, key=lambda x: (-x["points"], x["gd"], x["team"]))
-
     summary = ""
 
-    # 🥇 Leader
+    # 🏆 Leader
     leader = standings[0]
-    summary += f"🥇 {leader['team']} leads the league with {leader['points']} points.\n"
+    summary += f"🏆 {leader['team']} leads the league with {leader['points']} points.\n"
 
     # ⚔️ Chase Pack (within 6 points of leader, not including leader)
     chase_pack = []
     for team in standings[1:]:
         if leader["points"] - team["points"] <= 6:
             chase_pack.append(f"{team['team']} ({team['points']} pts)")
-
     if chase_pack:
         summary += f"⚔️ In the chase: {', '.join(chase_pack)}\n"
 
     # 📉 Relegation
     relegation = []
-    if len(standings) >= 7:
-        relegation_candidates = standings[5:]  # 6th, 7th, and below
+    if len(standings) >= 6:
         sixth_place_points = standings[5]["points"]
-
-        for team in relegation_candidates:
+        for team in standings[5:]:
             if team["points"] <= sixth_place_points + 4:
                 relegation.append(f"{team['team']} ({team['points']} pts)")
-
     if relegation:
         summary += f"\n📉 Relegation watch: {', '.join(relegation)}"
 
     return summary.strip()
-
+    
 def normalize(text):
     return unidecode.unidecode(text.strip().lower())
 
