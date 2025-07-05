@@ -1,5 +1,5 @@
 
-import unidecode
+import unidecodedata
 import os
 import sys
 import requests
