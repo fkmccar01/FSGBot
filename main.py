@@ -460,44 +460,40 @@ def scrape_league_standings(league_url):
     return standings
 
 def summarize_standings(standings):
-    if len(standings) < 7:
+    if not standings or len(standings) < 2:
         return "Not enough teams in the league to determine relegation or chase pack."
 
-    leader = standings[0]
-    sixth_place_points = standings[5]["points"]
-    relegation_zone = standings[5:]  # 6th and 7th place
-    chase_pack = []
+    standings = sorted(standings, key=lambda x: (-x["points"], x["gd"], x["team"]))
 
-    # Find teams within 6 points of the leader (excluding the leader)
+    summary = ""
+
+    # 🥇 Leader
+    leader = standings[0]
+    summary += f"🥇 {leader['team']} leads the league with {leader['points']} points.\n"
+
+    # ⚔️ Chase Pack (within 6 points of leader, not including leader)
+    chase_pack = []
     for team in standings[1:]:
         if leader["points"] - team["points"] <= 6:
-            chase_pack.append(team)
+            chase_pack.append(f"{team['team']} ({team['points']} pts)")
 
-    # Find teams within 4 points of 6th place (but not already 6th or 7th)
-    danger_zone = []
-    for team in standings[:5]:  # Only check places 1–5
-        if team["points"] <= sixth_place_points + 4:
-            danger_zone.append(team)
-
-    summary = f"📈 **Standings Update:**\n"
-    summary += f"🏆 Leader: {leader['team']} ({leader['points']} pts)\n"
-    
     if chase_pack:
-        summary += "📣 Teams chasing the title:\n"
-        for team in chase_pack:
-            summary += f"- {team['team']} ({team['points']} pts)\n"
-    
-    if relegation_zone:
-        summary += "⚠️ Relegation zone:\n"
-        for team in relegation_zone:
-            summary += f"- {team['team']} ({team['points']} pts)\n"
-    
-    if danger_zone:
-        summary += "🚨 At risk of relegation:\n"
-        for team in danger_zone:
-            summary += f"- {team['team']} ({team['points']} pts)\n"
-    
-    return summary
+        summary += f"⚔️ In the chase: {', '.join(chase_pack)}\n"
+
+    # 📉 Relegation
+    relegation = []
+    if len(standings) >= 7:
+        relegation_candidates = standings[5:]  # 6th, 7th, and below
+        sixth_place_points = standings[5]["points"]
+
+        for team in relegation_candidates:
+            if team["points"] <= sixth_place_points + 4:
+                relegation.append(f"{team['team']} ({team['points']} pts)")
+
+    if relegation:
+        summary += f"\n📉 Relegation watch: {', '.join(relegation)}"
+
+    return summary.strip()
 
 def normalize(text):
     return unidecode.unidecode(text.strip().lower())
