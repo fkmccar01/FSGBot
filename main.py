@@ -507,7 +507,7 @@ def generate_standings_summary(standings):
 
 @app.route("/", methods=["GET"])
 def index():
-    return "FSGBot is alive!"
+    return "Taycan A. Schitt is alive!"
 
 @app.route("/webhook", methods=["POST"])
 def groupme_webhook():
@@ -526,7 +526,7 @@ def groupme_webhook():
     text_lower = text.lower()
 
     # 🟢 1. Handle League Recap Requests
-    if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
+    if "Taycan A. Schitt" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
         if "goondesliga" in text_lower:
             league_url = GOONDESLIGA_URL
             send_groupme_message("Working on your Goondesliga recap... 📝")
@@ -590,7 +590,7 @@ def groupme_webhook():
         return "ok", 200
 
     # 🟠 2. Handle Specific Team Match Recap
-    if "fsgbot" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
+    if "Taycan A. Schitt" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
         resolved_team = resolve_team_name(text, team_mapping)
         if not resolved_team:
             return "ok", 200  # No team match, ignore
