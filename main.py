@@ -419,7 +419,7 @@ def scrape_league_standings_with_login(session, league_url):
         if len(cols) < 10:
             continue
         # Debug print all columns for this row
-        print("STANDINGS ROW COLS:", [col.text.strip() for col in cols])
+        sys.stderr.write(f"STANDINGS ROW COLS: {[col.text.strip() for col in cols]}\n")
         try:
             place = int(cols[0].text.strip().strip("."))
             team_link = cols[2].find("a")
