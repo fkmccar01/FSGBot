@@ -553,7 +553,7 @@ def groupme_webhook():
         final_message = (
             f"{league_name}\n\n"
             f"⚽ Match Results:\n" + "\n".join(match_scores) + "\n\n"
-            f"📊 Top performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
+            f"📊 Top Performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
             f"📈 Standings Update:\n{standings_summary}"
         )
     
