@@ -399,38 +399,36 @@ def get_match_summary_and_grades(game_id):
 
 import sys  # Make sure this is imported at the top
 
-def scrape_league_standings(league_url):
-    import requests
-    from bs4 import BeautifulSoup
+def scrape_league_standings_with_login(session, league_url):
+    response = session.get(league_url)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Failed to fetch league table with login: {response.status_code}\n")
+        return []
 
-    response = requests.get(league_url)
     soup = BeautifulSoup(response.text, "html.parser")
-
     standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
     if not standings_table:
-        raise ValueError("Standings table not found.")
+        sys.stderr.write("⚠️ Standings table not found in logged-in page.\n")
+        return []
 
     rows = standings_table.find_all("tr")[1:]  # Skip header row
     standings = []
-
-    for idx, row in enumerate(rows):
+    for row in rows:
         cols = row.find_all("td")
         if len(cols) < 10:
-            continue  # skip malformed rows
-
+            continue
         try:
-            place = int(cols[0].get_text(strip=True))
+            place = int(cols[0].text.strip())
             team_link = cols[2].find("a")
-            team_name = team_link.get_text(strip=True) if team_link else "Unknown"
-            points = int(cols[9].get_text(strip=True))
-
+            team_name = team_link.text.strip() if team_link else "Unknown"
+            points = int(cols[9].text.strip())
             standings.append({
                 "place": place,
                 "team": team_name,
                 "points": points
             })
         except Exception as e:
-            print(f"⚠️ Error parsing row {idx + 1}: {e}")
+            sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
             continue
 
     return standings
