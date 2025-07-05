@@ -548,11 +548,13 @@ def groupme_webhook():
             sys.stderr.write(f"⚠️ Error parsing standings: {e}\n")
             standings_summary = "Standings data is missing."
     
+        league_name = "The Goondesliga 🏆" if "goondesliga" in text_lower else "The Spoondesliga 🥄"
+
         final_message = (
-            f"📋 **{text.strip()}**\n\n"
-            f"⚽ **Match Results:**\n" + "\n".join(match_scores) + "\n\n"
+            f"{league_name}\n\n"
+            f"⚽ Match Results:\n" + "\n".join(match_scores) + "\n\n"
             f"📊 Top performers:\n" + "\n".join(f"- {p}" for p in top_players[:3]) + "\n\n"
-            f"📈 **Standings Update:**\n{standings_summary}"
+            f"📈 Standings Update:\n{standings_summary}"
         )
     
         send_groupme_message(final_message[:1500])
