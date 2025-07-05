@@ -410,32 +410,29 @@ def scrape_league_standings(league_url):
         raise ValueError("Standings table not found.")
 
     rows = standings_table.find_all("tr")
-    standings = []
     print(f"🧪 Found {len(rows)} rows in the standings table.")
+    
+    standings = []
 
     for idx, row in enumerate(rows):
         cols = row.find_all("td")
-        print(f"Row {idx + 1}: {len(cols)} columns")
-
         if len(cols) < 10:
             print(f"⚠️ Skipping row {idx + 1} — not enough columns.")
             continue
 
         try:
-            place = int(cols[0].text.strip())
-
-            # Team name is buried inside a nested table
+            place = int(cols[0].get_text(strip=True))
             team_cell = cols[2]
             team_link = team_cell.find("a")
-            team_name = team_link.text.strip() if team_link else "Unknown"
+            team_name = team_link.get_text(strip=True) if team_link else team_cell.get_text(strip=True)
 
-            games_played = int(cols[3].text.strip())
-            wins = int(cols[4].text.strip())
-            draws = int(cols[5].text.strip())
-            losses = int(cols[6].text.strip())
-            gf_ga = cols[7].text.strip()
-            goal_diff = int(cols[8].text.strip())
-            points = int(cols[9].text.strip())
+            games_played = int(cols[3].get_text(strip=True))
+            wins = int(cols[4].get_text(strip=True))
+            draws = int(cols[5].get_text(strip=True))
+            losses = int(cols[6].get_text(strip=True))
+            gf_ga = cols[7].get_text(strip=True)
+            gd = int(cols[8].get_text(strip=True))
+            points = int(cols[9].get_text(strip=True))
 
             standings.append({
                 "place": place,
@@ -445,10 +442,9 @@ def scrape_league_standings(league_url):
                 "draws": draws,
                 "losses": losses,
                 "gf_ga": gf_ga,
-                "gd": goal_diff,
+                "gd": gd,
                 "points": points,
             })
-
         except Exception as e:
             print(f"⚠️ Skipping row {idx + 1} due to error: {e}")
             continue
