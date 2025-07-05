@@ -423,13 +423,12 @@ def scrape_league_standings_with_login(session, league_url):
         try:
             place = int(cols[0].text.strip().strip("."))
             team_link = cols[2].find("a")
-            team_name = team_link.text.strip() if team_link else "Unknown"
+            team_name = team_link.text.strip() if team_link else cols[2].text.strip()  # fallback to text if no <a>
             
-            # Replace col index 8 with correct col after inspecting print output
-            diff_text = cols[7].text.strip().replace("+", "")  # Try 7 instead of 8
+            diff_text = cols[10].text.strip().replace("+", "")
             diff = int(diff_text)
-    
-            points = int(cols[9].text.strip())
+            
+            points = int(cols[11].text.strip())
     
             standings.append({
                 "place": place,
