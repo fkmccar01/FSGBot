@@ -28,7 +28,7 @@ def normalize(text):
     text = unidecode.normalize('NFKD', text)
     text = text.encode('ASCII', 'ignore').decode('utf-8')
     text = re.sub(r'[^a-z0-9 ]+', '', text.lower())
-    return text.strip()
+    return unidecode.unidecode(text.strip().lower())
 
 def build_team_name_mapping(profiles):
     mapping = {}
@@ -503,9 +503,6 @@ def generate_standings_summary(standings):
         summary += f"\n📉 Relegation watch: {', '.join(relegation)}"
 
     return summary.strip()
-    
-def normalize(text):
-    return unidecode.unidecode(text.strip().lower())
 
 @app.route("/", methods=["GET"])
 def index():
