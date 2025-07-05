@@ -605,6 +605,8 @@ def groupme_webhook():
                     summary = scrape_and_summarize_by_game_id(match["game_id"])
                     send_groupme_message(summary)
                     return "ok", 200
+
+    return "ok", 200
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
