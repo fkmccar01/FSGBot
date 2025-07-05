@@ -26,10 +26,10 @@ def normalize(text):
     """Lowercases, removes accents, and strips special characters for reliable comparison."""
     if not text:
         return ""
-    text = unidecode.normalize('NFKD', text)
+    text = unicodedata.normalize('NFKD', text)
     text = text.encode('ASCII', 'ignore').decode('utf-8')
     text = re.sub(r'[^a-z0-9 ]+', '', text.lower())
-    return unidecode.unidecode(text.strip().lower())
+    return text
 
 def build_team_name_mapping(profiles):
     mapping = {}
