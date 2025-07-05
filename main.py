@@ -456,7 +456,7 @@ def generate_standings_summary(standings):
     # ⚔️ Chase Pack (within 6 points of leader, not including leader)
     chase_pack = []
     for team in standings[1:]:
-        if leader["points"] - team["points"] <= 6:
+        if leader["points"] - team["points"] <= 4:
             chase_pack.append(f"{team['team']} ({team['points']} pts)")
     if chase_pack:
         summary += f"⚔️ In the chase: {', '.join(chase_pack)}\n"
