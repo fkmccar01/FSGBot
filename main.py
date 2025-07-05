@@ -591,12 +591,12 @@ def groupme_webhook():
 
     # 🟠 2. Handle Specific Team Match Recap
     if "fsgbot" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
-    resolved_team = resolve_team_name(text, team_mapping)
+        resolved_team = resolve_team_name(text, team_mapping)
         if not resolved_team:
             return "ok", 200  # No team match, ignore
-    
+        
         league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
-    
+        
         for league_url in league_urls:
             matches = get_latest_game_ids_from_league(league_url)
             for match in matches:
