@@ -451,11 +451,11 @@ for idx, row in enumerate(rows):
             print(f"Skipping row due to error: {e}")
             continue
 
-print(f"\n✅ Total parsed teams: {len(standings)}")
-for team in standings:
-    print(f"- {team['team']} ({team['points']} pts)")
+        print(f"\n✅ Total parsed teams: {len(standings)}")
+        for team in standings:
+            print(f"- {team['team']} ({team['points']} pts)")
 
-return standings
+        return standings
 
 def summarize_league(league_url):
     send_groupme_message("Working on your recap... 📝")
