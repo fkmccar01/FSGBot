@@ -1,4 +1,5 @@
 import re
+import unicodedata
 import os
 import sys
 import requests
