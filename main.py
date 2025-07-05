@@ -582,7 +582,7 @@ def groupme_webhook():
                 top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
-        standings = league_standings(league_url)
+        standings = scrape_league_standings(league_url)
         standings_summary = summarize_standings(standings)
 
         final_message = (
