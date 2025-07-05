@@ -3,7 +3,7 @@
     "chat_handle": "Dirty Malone and the Boys",
     "aliases": ["Pistol Pail", "The Pistol", "Pail"],
     "description": "Manager of Malone FC. Serial runner-up who has an obsession for veteran players. Has finished 2nd most times out of anybody in the league.",
-    "team": "Skull Mountain Boys"
+    "team": "Skull Mountain Boys",
     "team_alias": ["Malone FC", "the Fatties"],
     "trophies": {
       "the Spoondesliga": 2
@@ -14,7 +14,7 @@
     "chat_handle": "Signora Itzaronia 💅🍝",
     "aliases": ["Signora"],
     "description": "Temporary Manager of Sweatfield. Married to Itzaroni who GreggBot likes to tease. She is a gambling addict, but often wins and makes her team lots of money.",
-    "team": "Sweatfield Wednesday"
+    "team": "Sweatfield Wednesday",
     "team_alias": ["Sweatfield"],
     "trophies": {
       "the Spoondesliga": 2
@@ -25,7 +25,7 @@
     "chat_handle": "Angel of Dean",
     "aliases": ["Angel of Dean", "AoD", "Ping 2"],
     "description": "Manager of Bayer Liverfillen. Constantly on the horizon of building a good team, but never gets there. Always finishes at the bottom of the table. Credited for building the teams that won the Aquadicks their only 2 Goondesligas.",
-    "team": "Bayer Liverfillen"
+    "team": "Bayer Liverfillen",
     "team_alias": ["Liverfillen", "the Beervarians"],
     "trophies": {
       "the Spoondesliga": 1
@@ -36,7 +36,7 @@
     "chat_handle": "Mt Veeder",
     "aliases": ["Dino Vince"],
     "description": "Manager of Mount Veeder. Known for his outdated tactics. Loves dad jokes, but everyone mocks him for that. Considered the superior Vince over Itzaroni occasionally.",
-    "team": "Mount Veeder"
+    "team": "Mount Veeder",
     "team_alias": ["Veeder", "Mt. Veeder"],
     "trophies": {
       "the Spoondesliga": 2
@@ -47,7 +47,7 @@
     "chat_handle": "AquaFan🏆🏆🥄",
     "aliases": ["Aquafan"],
     "description": "Owner of AquaDjimibia. Super rich, eclectic owner of the Aquadicks. Only knows how to play 442. Underachiever. Easy to rattle. Loves Neal 'The Seal' Sealman, a former player of his.",
-    "team": "AquaDjimibia"
+    "team": "AquaDjimibia",
     "team_alias": ["Aquadiqs", "Aquadicks"],
     "trophies": {
       "the Goondesliga": 2,
@@ -59,7 +59,7 @@
     "chat_handle": "Campbell Ping 🥄",
     "aliases": ["Ping", "Ping 1"],
     "description": "Manager of the Heckletts. Worst manager in the league. Only cares about selling players out of the league. The Ping family owns Burger Ping, a huge burger chain in the Goonited Kingdom. Ping Sauce is addicting. Always has one of the highest valued squads but can't get promoted out of the Spoondesliga. Famous for selling players in bad deals to Franzia which helped Franzia win so many titles.",
-    "team": "Heckley Athletic"
+    "team": "Heckley Athletic",
     "team_alias": ["The Heckletts"],
     "trophies": {
       "the Spoondesliga": 1
@@ -70,7 +70,7 @@
     "chat_handle": "Cis Kyle 🪘🏆🏆🏆🏆🏆🏆🏆🥄",
     "aliases": ["Cis Kyle", "Cissy"],
     "description": "Manager of the Woké Juniors. Arrogant, controversial manager constantly at odds with the liberal population of Sensitivecity and The Board of his club. Known for player development and building teams.",
-    "team": "Woké Juniors"
+    "team": "Woké Juniors",
     "team_alias": ["Woké"],
     "trophies": {
       "the Goondesliga": 7,
@@ -83,7 +83,7 @@
     "chat_handle": "Kzar Kieran the Inkzpired 🔜 🏆"",
     "aliases": ["the Kzar", "the Almighty Kzar", "Kzar"],
     "description": "Manager of Shepard United and the Kzar of the Goondesliga and the Goonited Kingdom. Runs the league and is all-powerful.",
-    "team": "Shepard United"
+    "team": "Shepard United",
     "team_alias": ["Shepard"],
     "trophies": {
       "the Goondesliga": 1,
@@ -95,7 +95,7 @@
     "chat_handle": "🏆x16- Gulag Gimp - KK Champ x2"",
     "aliases": ["Gulag Genius", "Gulag “Genius”", "GG"],
     "description": "Manager of Franzia. Most titles by far, but struggling lately. Slave to the Fascist State of Franzia, a dystopian, autocratic nightmare of a state led by the iron-fisted rule of Gaydolf Titler. Always tries to fleece trade partners in transfer deals.",
-    "team": "A.C. Franiza"
+    "team": "A.C. Franiza",
     "team_alias": ["Franzia", "the Fascists"],
     "trophies": {
       "the Goondesliga": 14,
@@ -108,7 +108,7 @@
     "chat_handle": "Mickey Gilberti",
     "aliases": ["Mickel", "Mickey"],
     "description": "Owner of Jersey FC. Super nice, albeit naive. New to the Goondesliga, but wants to try his hardest.",
-    "team": "Jersey FC"
+    "team": "Jersey FC",
     "team_alias": ["Jersey", "JerEZ"],
     "trophies": {
       "the Spoondesliga": 1
@@ -118,8 +118,8 @@
   "General_Gergg": {
     "chat_handle": "Governor 🥄🥄 General 🏆 Gerg",
     "aliases": ["GreggBot", "General Gergg"],
-    "description": Blank
-    "team": "Inter BBW"
+    "description": "Blank.",
+    "team": "Inter BBW",
     "team_alias": ["Inter", "BBW"],
     "trophies": {
       "the Goondesliga": 2,
@@ -131,31 +131,31 @@
     "Tartega": {
       "chat_handle": "Rich Ortega",
       "aliases": ["Tartega", "Rich Tartega"],
-      "description": "Blank",
-      "team": "Turntables United"
+      "description": "Blank.",
+      "team": "Turntables United",
       "team_alias": ["Turdtables", "Junkies"],
       "trophies": {
         "the Spoondesliga": 2
       },
-      "tone_directive": "Blank"
+      "tone_directive": "Blank."
   },
     "Greasy_Geoff": {
       "chat_handle": "Greasy Geoff II 🏆 🏆 🥄 🥄",
       "aliases": ["Greasy Geoff", "Geoff"],
-      "description": "Blank",
-      "team": "Olympus FC"
+      "description": "Blank.",
+      "team": "Olympus FC",
       "team_alias": ["the Greeks", "Olympiss"],
       "trophies": {
         "the Goondesliga": 2,
         "the Spoondesliga": 2
       },
-      "tone_directive": "Blank"
+      "tone_directive": "Blank."
   },
     "Frankie_Ciggs": {
       "chat_handle": "AC Salame 🏆🏆🏆🥄",
       "aliases": ["Frankie Ciggs", "Ciggsy"],
       "description": "Manager of the Skillamis. Unhinged. Loves cigarettes as his name implies. Smokes them in large quantities all at once and in creative ways. Paranoid of AI and GreggBot.",
-      "team": "AC Salame"
+      "team": "AC Salame",
       "team_alias": ["the Skillamis", "Salame"],
       "trophies": {
         "the Goondesliga": 3,
