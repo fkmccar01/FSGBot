@@ -558,7 +558,7 @@ def groupme_webhook():
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
         standings = scrape_league_standings(league_url)
-        standings_summary = summarize_standings(standings)
+        standings_summary = generate_standings_summary(standings)
 
         final_message = (
             f"📋 **{text.strip()}**\n\n"
