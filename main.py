@@ -415,31 +415,31 @@ def scrape_league_standings_with_login(session, league_url):
     rows = standings_table.find_all("tr")[1:]  # Skip header row
     standings = []
     for row in rows:
-    cols = row.find_all("td")
-    if len(cols) < 10:
-        continue
-    # Debug print to see all columns content for this row
-    print([col.text.strip() for col in cols])
-    # Then try to parse with the right column indexes:
-    try:
-        place = int(cols[0].text.strip().strip("."))
-        team_link = cols[2].find("a")
-        team_name = team_link.text.strip() if team_link else "Unknown"
-
-        # From print, check which col is "Diff" (goal difference) — probably cols[7]
-        diff_text = cols[7].text.strip().replace("+", "")
-        diff = int(diff_text)
-
-        points = int(cols[9].text.strip())
-
-        standings.append({
-            "place": place,
-            "team": team_name,
-            "points": points,
-            "gd": diff
-        })
-    except Exception as e:
-        sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
+        cols = row.find_all("td")
+        if len(cols) < 10:
+            continue
+        # Debug print to see all columns content for this row
+        print([col.text.strip() for col in cols])
+        # Then try to parse with the right column indexes:
+        try:
+            place = int(cols[0].text.strip().strip("."))
+            team_link = cols[2].find("a")
+            team_name = team_link.text.strip() if team_link else "Unknown"
+    
+            # From print, check which col is "Diff" (goal difference) — probably cols[7]
+            diff_text = cols[7].text.strip().replace("+", "")
+            diff = int(diff_text)
+    
+            points = int(cols[9].text.strip())
+    
+            standings.append({
+                "place": place,
+                "team": team_name,
+                "points": points,
+                "gd": diff
+            })
+        except Exception as e:
+            sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
             continue
 
     return standings
