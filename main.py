@@ -510,7 +510,7 @@ def groupme_webhook():
     text_lower = text.lower()
 
     # 🟢 1. Handle League Recap Requests
-    if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]):
+    if "fsgbot" in text_lower and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
         if "goondesliga" in text_lower:
             league_url = GOONDESLIGA_URL
             send_groupme_message("Working on your Goondesliga recap... 📝")
