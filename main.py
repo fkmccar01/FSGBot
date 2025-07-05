@@ -17,7 +17,7 @@ X11_PASSWORD = os.environ.get("X11_PASSWORD")
 GOONDESLIGA_URL = os.environ.get("GOONDESLIGA_URL")
 SPOONDESLIGA_URL = os.environ.get("SPOONDESLIGA_URL")
 
-bot_aliases = ["@taycan a. schitt", "@taycan a schitt", "taycan", "taycan a", "taycan a."]
+bot_aliases = ["@taycan a. schitt", "@taycan a schitt", "@taycan", "@taycan a", "@taycan a."]
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
