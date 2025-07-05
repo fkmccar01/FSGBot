@@ -4,8 +4,6 @@ import os
 import sys
 import requests
 import json
-with open("profiles.json", "r") as f:
-    PROFILES = json.load(f)
 from bs4 import BeautifulSoup
 from flask import Flask, request
 
@@ -20,6 +18,29 @@ GOONDESLIGA_URL = os.environ.get("GOONDESLIGA_URL")
 SPOONDESLIGA_URL = os.environ.get("SPOONDESLIGA_URL")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+with open("profiles.json", "r") as f:
+    PROFILES = json.load(f)
+
+def build_team_name_mapping(profiles):
+    mapping = {}
+    for profile in profiles.values():
+        team = profile.get("team")
+        aliases = profile.get("team_alias", [])
+        if team:
+            mapping[team.lower()] = team
+            for alias in aliases:
+                mapping[alias.lower()] = team
+    return mapping
+
+team_mapping = build_team_name_mapping(profiles)
+
+def resolve_team_name(text, team_mapping):
+    text = text.lower()
+    for alias, official_name in team_mapping.items():
+        if alias in text:
+            return official_name
+    return None
 
 def send_groupme_message(text):
     url = "https://api.groupme.com/v3/bots/post"
@@ -564,7 +585,10 @@ def groupme_webhook():
 
     # 🟠 2. Handle Specific Team Match Recap
     if "fsgbot" in text_lower and any(k in text_lower for k in ["highlight", "recap"]):
-        team_query = normalize(text)
+        requested_team = resolve_team_name(text, team_mapping)
+
+        if not requested_team:
+            return "ok", 200
 
         league_urls = [
             GOONDESLIGA_URL,
@@ -577,14 +601,10 @@ def groupme_webhook():
 
             matches = get_latest_game_ids_from_league(league_url)
             for match in matches:
-                if normalize(match["home_team"]) in team_query or normalize(match["away_team"]) in team_query:
+                if requested_team in [match["home_team"], match["away_team"]]:
                     summary = scrape_and_summarize_by_game_id(match["game_id"])
                     send_groupme_message(summary)
                     return "ok", 200
-
-    # 🔴 Fallback
-    send_groupme_message("Sorry, I couldn’t find a recent match for any team in your message.")
-    return "ok", 200
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
