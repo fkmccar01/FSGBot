@@ -450,36 +450,6 @@ def scrape_league_standings(league_url):
 
     return standings
 
-def summarize_league(league_url):
-    send_groupme_message("Working on your recap... 📝")
-    matches = get_latest_game_ids_from_league(league_url)
-    if not matches:
-        return "[Could not find recent matches in this league.]"
-
-    recent_summaries = []
-    all_players = []
-
-    for m in matches:
-        try:
-            summary, players = get_match_summary_and_grades(m["game_id"])
-            recent_summaries.append({
-                "home": m["home_team"],
-                "away": m["away_team"],
-                "summary": summary
-            })
-            all_players.extend(players)
-        except Exception as e:
-            sys.stderr.write(f"⚠️ Failed to process game {m['game_id']}: {e}\n")
-
-    # Sort players by grade and take top 3
-    top_players = sorted([p for p in all_players if p["grade"]], key=lambda x: -x["grade"])[:3]
-
-    # Extract standings
-    standings = league_standings(league_url)
-
-    # Format prompt for Gemini
-    return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
-
 def summarize_standings(standings):
     if len(standings) < 7:
         return "📈 **Standings Update:**\nNot enough teams in the league to determine relegation or chase pack."
