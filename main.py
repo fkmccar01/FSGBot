@@ -406,6 +406,12 @@ def scrape_league_standings(league_url):
     html = response.text
     soup = BeautifulSoup(html, "html.parser")
 
+print(f"\n🛠️ DEBUG: Raw table has {len(rows)} rows")
+
+for idx, row in enumerate(rows):
+    cols = row.find_all("td")
+    print(f"Row {idx + 1}: {len(cols)} columns")
+
     standings_table = soup.find("table", id="ctl00_cphMain_dgStandings")
     if not standings_table:
         raise ValueError("Standings table not found.")
@@ -445,6 +451,10 @@ def scrape_league_standings(league_url):
             print(f"Skipping row due to error: {e}")
             continue
 
+print(f"\n✅ Total parsed teams: {len(standings)}")
+for team in standings:
+    print(f"- {team['team']} ({team['points']} pts)")
+
     return standings
 
 def summarize_league(league_url):
@@ -472,7 +482,7 @@ def summarize_league(league_url):
     top_players = sorted([p for p in all_players if p["grade"]], key=lambda x: -x["grade"])[:3]
 
     # Extract standings
-    standings = scrape_league_standings(league_url)
+    standings = ague_standings(league_url)
 
     # Format prompt for Gemini
     return format_league_gemini_prompt(league_url, recent_summaries, top_players, standings)
@@ -495,20 +505,20 @@ def summarize_standings(standings):
         if i >= 5 and points <= sixth_place_points + 4:
             relegation_threat.append(team)
 
-    summary = f"🏆 Current leader: {leader['name']} with {leader['points']} points.\n"
+    summary = f"🏆 Current leader: {leader['team']} with {leader['points']} points.\n"
 
     if chasing_teams:
         summary += "\n💥 Chasing pack:\n"
         for team in chasing_teams:
-            summary += f"- {team['name']} ({team['points']} pts)\n"
+            summary += f"- {team['team']} ({team['points']} pts)\n"
 
     summary += "\n⚠️ Relegation danger zone:\n"
     if len(standings) >= 4:
-        summary += f"- 7th: {standings[6]['name']} ({standings[6]['points']} pts)\n"
-        summary += f"- 6th: {standings[5]['name']} ({standings[5]['points']} pts)\n"
+        summary += f"- 7th: {standings[6]['team']} ({standings[7]['points']} pts)\n"
+        summary += f"- 6th: {standings[5]['team']} ({standings[6]['points']} pts)\n"
     for team in relegation_threat:
-        if team not in standings[5:7]:  # avoid repeating 6th/7th
-            summary += f"- {team['name']} ({team['points']} pts)\n"
+        if team not in standings[4:6]:  # avoid repeating 6th/7th
+            summary += f"- {team['team']} ({team['points']} pts)\n"
 
     return summary.strip()
 
@@ -579,7 +589,7 @@ def groupme_webhook():
                 top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
                 top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊)")
 
-        standings = scrape_league_standings(league_url)
+        standings = ague_standings(league_url)
         standings_summary = summarize_standings(standings)
 
         final_message = (
