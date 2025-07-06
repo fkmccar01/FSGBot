@@ -508,11 +508,13 @@ def generate_standings_summary(standings):
 
     return summary.strip()
 
-def scrape_upcoming_fixtures(url):
-    response = requests.get(url)
+def scrape_upcoming_fixtures_from_standings_page(session, url):
+    """Scrapes upcoming fixtures from the same page as standings."""
+    response = session.get(url)
     if response.status_code != 200:
-        sys.stderr.write(f"⚠️ Failed to fetch upcoming fixtures page: {response.status_code}\n")
+        sys.stderr.write(f"⚠️ Failed to fetch standings + fixtures page: {response.status_code}\n")
         return []
+
     soup = BeautifulSoup(response.text, "html.parser")
     fixtures = []
     rows = soup.select("#ctl00_cphMain_dgUpcoming tr")
@@ -526,7 +528,11 @@ def scrape_upcoming_fixtures(url):
         if len(tds) >= 4:
             home = tds[1].get_text(strip=True)
             away = tds[3].get_text(strip=True)
-            fixtures.append({"home_team": home, "away_team": away, "game_id": game_id})
+            fixtures.append({
+                "home_team": home,
+                "away_team": away,
+                "game_id": game_id
+            })
     return fixtures
 
 def generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_standings, spoon_standings):
@@ -677,29 +683,30 @@ def groupme_webhook():
                     return "ok", 200
 
     # 🟣 3. Handle TV Schedule Requests
-    if any(bot_name in text_lower for bot_name in bot_aliases):
-        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "schedule", "guide", "games"]):
-            sys.stderr.write("✅ Triggered TV schedule command.\n")
+if any(bot_name in text_lower for bot_name in bot_aliases):
+    if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "schedule", "guide", "games"]):
+        sys.stderr.write("✅ Triggered TV schedule command.\n")
 
-            session = get_logged_in_session()
-            if not session:
-                send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
-                return "ok", 200
-
-            goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-            spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-
-            goon_fixtures = scrape_upcoming_fixtures(GOONDESLIGA_URL)
-            spoon_fixtures = scrape_upcoming_fixtures(SPOONDESLIGA_URL)
-
-            tv_schedule = generate_tv_schedule_from_upcoming(
-                goon_fixtures, spoon_fixtures,
-                goon_standings, spoon_standings
-            )
-
-            send_groupme_message(tv_schedule)
-
+        session = get_logged_in_session()
+        if not session:
+            send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
             return "ok", 200
+
+        goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+        spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+
+        # 🔁 UPDATED FIXTURE SCRAPING
+        goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
+        spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+
+        tv_schedule = generate_tv_schedule_from_upcoming(
+            goon_fixtures, spoon_fixtures,
+            goon_standings, spoon_standings
+        )
+
+        send_groupme_message(tv_schedule)
+
+        return "ok", 200
 
     return "ok", 200
 
