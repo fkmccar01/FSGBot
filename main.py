@@ -479,22 +479,24 @@ def generate_standings_summary(standings):
     if not standings:
         return "Standings data is missing."
 
-    standings = sorted(standings, key=lambda x: (-x["points"], x["gd"], x["team"]))
+    # Sort by points (desc), then goal diff (desc), then name
+    standings = sorted(standings, key=lambda x: (-x["points"], -x["gd"], x["team"]))
     summary = ""
 
-    # 🏆 Leader
+    # 🏆 True leader based on tiebreakers
     leader = standings[0]
-    summary += f"🏆 {leader['team']} leads the league with {leader['points']} points.\n"
+    summary += f"🏆 {leader['team']} leads the league with {leader['points']} points (GD: {leader['gd']}).\n"
 
-    # ⚔️ Hunt Pack (within 6 points of leader, not including leader)
+    # ⚔️ In the Hunt: teams within 4 points of leader, excluding leader
     hunt_pack = []
     for team in standings[1:]:
         if leader["points"] - team["points"] <= 4:
             hunt_pack.append(f"{team['team']} ({team['points']} pts)")
+
     if hunt_pack:
         summary += f"⚔️ In the Hunt: {', '.join(hunt_pack)}\n"
 
-    # 📉 Relegation
+    # 📉 Relegation Watch: 6th place and teams within 4 points of 6th
     relegation = []
     if len(standings) >= 6:
         sixth_place_points = standings[5]["points"]
