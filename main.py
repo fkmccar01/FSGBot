@@ -569,8 +569,11 @@ def manual_tv_schedule():
     spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
     goon_fixtures = scrape_upcoming_fixtures(GOONDESLIGA_URL)
     spoon_fixtures = scrape_upcoming_fixtures(SPOONDESLIGA_URL)
-    tv_text = generate_tv_schedule(goon_fixtures, spoon_fixtures, goon_standings, spoon_standings)
-    send_groupme_message(tv_text[:1500])
+    tv_schedule = generate_tv_schedule_from_upcoming(
+    goon_fixtures, spoon_fixtures,
+    goon_standings, spoon_standings
+    )
+    
     return "ok", 200
 
 @app.route("/", methods=["GET"])
