@@ -647,7 +647,7 @@ def groupme_webhook():
             rated_players = [p for p in player_grades if p["grade"] is not None]
             if rated_players:
                 top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
-                top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊, {top_player['team']}"))
+                top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊, {top_player['team']})")
 
         # Use the logged-in session to scrape standings
         standings = scrape_league_standings_with_login(session, league_url)
