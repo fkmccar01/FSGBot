@@ -508,6 +508,62 @@ def generate_standings_summary(standings):
 
     return summary.strip()
 
+def generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings):
+    channels = [
+        "FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Deportes",
+        "FSG Xtra", "FSG Max", "FSG On Demand", "FSG After Dark",
+        "FSG Public Access", "FSG Kids"
+    ]
+
+    def get_points(team, standings):
+        for entry in standings:
+            if entry["team"] == team:
+                return entry["points"]
+        return 0
+
+    all_matches = []
+
+    for match in goon_matches:
+        pts = get_points(match["home_team"], goon_standings) + get_points(match["away_team"], goon_standings)
+        all_matches.append({
+            "division": "Goondesliga",
+            "home": match["home_team"],
+            "away": match["away_team"],
+            "combined_points": pts
+        })
+
+    for match in spoon_matches:
+        pts = get_points(match["home_team"], spoon_standings) + get_points(match["away_team"], spoon_standings)
+        all_matches.append({
+            "division": "Spoondesliga",
+            "home": match["home_team"],
+            "away": match["away_team"],
+            "combined_points": pts
+        })
+
+    # Find top Goondesliga match
+    top_goon = max((m for m in all_matches if m["division"] == "Goondesliga"), key=lambda m: m["combined_points"])
+
+    # Sort all matches by total points
+    all_matches.sort(key=lambda m: m["combined_points"], reverse=True)
+
+    output = ["📺 This week’s Goondesliga & Spoondesliga TV schedule:\n"]
+    assigned_channels = set()
+    for i, match in enumerate(all_matches):
+        if match == top_goon:
+            channel = "FSG"
+        else:
+            for ch in channels:
+                if ch != "FSG" and ch not in assigned_channels:
+                    channel = ch
+                    break
+        assigned_channels.add(channel)
+        prefix = "🔴" if channel == "FSG" else "⚪"
+        line = f"{prefix} {channel}: {match['home']} vs {match['away']} (Combined: {match['combined_points']} pts)"
+        output.append(line)
+
+    return "\n".join(output)
+
 @app.route("/", methods=["GET"])
 def index():
     return "Taycan A. Schitt is alive!"
@@ -607,6 +663,23 @@ def groupme_webhook():
                     summary = scrape_and_summarize_by_game_id(match["game_id"])
                     send_groupme_message(summary)
                     return "ok", 200
+
+    # 🟣 3. Handle TV Schedule Requests
+        if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["tv guide", "tv kzhedule", "what games are on fsg", "fsg kzhedule"]):
+            session = get_logged_in_session()
+            if not session:
+                send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
+                return "ok", 200
+    
+            goond_matches = get_latest_game_ids_from_league(GOONDESLIGA_URL)
+            spoon_matches = get_latest_game_ids_from_league(SPOONDESLIGA_URL)
+    
+            goond_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+            spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+    
+            tv_schedule = generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings)
+            send_groupme_message(tv_schedule[:1500])
+            return "ok", 200
 
     return "ok", 200
     
