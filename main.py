@@ -686,14 +686,17 @@ def groupme_webhook():
                 send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
                 return "ok", 200
 
-            goon_matches = get_latest_game_ids_from_league(GOONDESLIGA_URL)
-            spoon_matches = get_latest_game_ids_from_league(SPOONDESLIGA_URL)
+            goon_standings = scrape_standings(GOONDESLIGA_URL)
+            spoon_standings = scrape_standings(SPOONDESLIGA_URL)
 
-            goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-            spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+            goon_fixtures = scrape_upcoming_fixtures(GOONDESLIGA_FIXTURES_URL)
+            spoon_fixtures = scrape_upcoming_fixtures(SPOONDESLIGA_FIXTURES_URL)
 
-            tv_schedule = generate_tv_schedule_from_upcoming(goon_matches, spoon_matches, goon_standings, spoon_standings)
-            send_groupme_message(tv_schedule[:1500])
+            tv_schedule = generate_tv_schedule_from_upcoming(
+                goon_fixtures, spoon_fixtures,
+                goon_standings, spoon_standings
+            )
+            
             return "ok", 200
     
 if __name__ == "__main__":
