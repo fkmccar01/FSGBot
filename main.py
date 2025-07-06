@@ -665,23 +665,24 @@ def groupme_webhook():
                     return "ok", 200
 
     # 🟣 3. Handle TV Schedule Requests
-        if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["tv guide", "tv kzhedule", "what games are on fsg", "fsg kzhedule"]):
+    if any(bot_name in text_lower for bot_name in bot_aliases):
+        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "schedule", "guide", "games"]):
+            sys.stderr.write("✅ Triggered TV schedule command.\n")
+
             session = get_logged_in_session()
             if not session:
                 send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
                 return "ok", 200
-    
+
             goon_matches = get_latest_game_ids_from_league(GOONDESLIGA_URL)
             spoon_matches = get_latest_game_ids_from_league(SPOONDESLIGA_URL)
-    
+
             goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
             spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-    
+
             tv_schedule = generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings)
             send_groupme_message(tv_schedule[:1500])
             return "ok", 200
-
-    return "ok", 200
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
