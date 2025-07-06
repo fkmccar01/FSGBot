@@ -556,7 +556,7 @@ def generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_stand
     marquee = next((m for m in sorted_matches if m["division"] == "Goondesliga"), None)
     output = ["📺 FoxSportsGoon TV Kzhedule ⚽\n"]
     if marquee:
-        output.append(f"FSG Marquee Matchup: {marquee['match']} (Combined: {marquee['combined_points']} pts)")
+        output.append(f"🌟FSG Marquee Matchup🌟: {marquee['match']} (Combined: {marquee['combined_points']} pts)")
     used = {marquee["match"]} if marquee else set()
     i = 1
     for match in sorted_matches:
