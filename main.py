@@ -485,7 +485,7 @@ def generate_standings_summary(standings):
 
     # 🏆 True leader based on tiebreakers
     leader = standings[0]
-    summary += f"🏆 {leader['team']} leads the league with {leader['points']} points (GD: {leader['gd']}).\n"
+    summary += f"🏆 {leader['team']} leads the league with {leader['points']} points.\n\n"
 
     # ⚔️ In the Hunt: teams within 4 points of leader, excluding leader
     hunt_pack = []
@@ -496,7 +496,11 @@ def generate_standings_summary(standings):
     if hunt_pack:
         summary += f"⚔️ In the Hunt: {', '.join(hunt_pack)}\n"
 
-    # 📉 Relegation Watch: 6th place and teams within 4 points of 6th
+    # 📉 Relegation / 🪨 Rock Bottom Watch
+    if "goondesliga" in league_name.lower():
+        bottom_watch_label = "📉 Relegation watch"
+    else:
+        bottom_watch_label = "🪨 Rock Bottom Watch"
     relegation = []
     if len(standings) >= 6:
         sixth_place_points = standings[5]["points"]
@@ -504,7 +508,9 @@ def generate_standings_summary(standings):
             if team["points"] <= sixth_place_points + 4:
                 relegation.append(f"{team['team']} ({team['points']} pts)")
     if relegation:
-        summary += f"\n📉 Relegation watch: {', '.join(relegation)}"
+        summary += f"\n📉 {bottom_watch_label}: {', '.join(relegation)}"
+
+    return summary.strip()
 
     return summary.strip()
 
