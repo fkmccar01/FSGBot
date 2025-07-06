@@ -536,7 +536,7 @@ def scrape_upcoming_fixtures_from_standings_page(session, url):
     return fixtures
 
 def generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_standings, spoon_standings):
-    channels = ["FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Kids"]
+    channels = ["FSG", "FSG2", "FSG3", "FSG+", "FSG Radio 📻", "FSG Kids 🧸"]
     points_map = {normalize(team["team"]): team["points"] for team in goon_standings + spoon_standings}
     all_matches = []
     for match in goon_fixtures + spoon_fixtures:
@@ -684,7 +684,7 @@ def groupme_webhook():
 
     # 🟣 3. Handle TV Schedule Requests
     if any(bot_name in text_lower for bot_name in bot_aliases):
-        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "schedule", "guide", "games"]):
+        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "kzhedule", "schedule", "guide", "games"]):
             sys.stderr.write("✅ Triggered TV schedule command.\n")
     
             session = get_logged_in_session()
