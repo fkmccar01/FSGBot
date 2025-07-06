@@ -520,7 +520,7 @@ def scrape_upcoming_fixtures_from_standings_page(session, url):
     rows = soup.select("#ctl00_cphMain_dgUpcoming tr")
     for row in rows:
         onclick = row.get("onclick", "")
-        match = re.search(r"GameID=(\\d+)", onclick)
+        match = re.search(r"GameID=(\d+)", onclick)
         if not match:
             continue
         game_id = match.group(1)
