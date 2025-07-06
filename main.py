@@ -511,58 +511,65 @@ def generate_standings_summary(standings):
 def generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings):
     channels = [
         "FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Deportes",
-        "FSG Xtra", "FSG Max", "FSG On Demand", "FSG After Dark",
-        "FSG Public Access", "FSG Kids"
+        "FSG Xtra", "FSG Max", "FSG On Demand", "FSG After Dark", "FSG Public Access", "FSG Kids"
     ]
 
-    def get_points(team, standings):
-        for entry in standings:
-            if entry["team"] == team:
-                return entry["points"]
-        return 0
+    # Create point lookup from standings
+    points_map = {}
+    for team in goon_standings + spoon_standings:
+        points_map[normalize(team["team"])] = team["points"]
 
     all_matches = []
+    for match in goon_matches + spoon_matches:
+        home = normalize(match["home_team"])
+        away = normalize(match["away_team"])
 
-    for match in goon_matches:
-        pts = get_points(match["home_team"], goon_standings) + get_points(match["away_team"], goon_standings)
+        home_points = points_map.get(home)
+        away_points = points_map.get(away)
+
+        # If any team is missing, default to 0 points
+        if home_points is None:
+            sys.stderr.write(f"⚠️ Missing home team in standings: {match['home_team']}\n")
+            home_points = 0
+        if away_points is None:
+            sys.stderr.write(f"⚠️ Missing away team in standings: {match['away_team']}\n")
+            away_points = 0
+
+        combined = home_points + away_points
         all_matches.append({
-            "division": "Goondesliga",
-            "home": match["home_team"],
-            "away": match["away_team"],
-            "combined_points": pts
+            "match": f"{match['home_team']} vs {match['away_team']}",
+            "combined_points": combined,
+            "division": "Goondesliga" if match in goon_matches else "Spoondesliga"
         })
 
-    for match in spoon_matches:
-        pts = get_points(match["home_team"], spoon_standings) + get_points(match["away_team"], spoon_standings)
-        all_matches.append({
-            "division": "Spoondesliga",
-            "home": match["home_team"],
-            "away": match["away_team"],
-            "combined_points": pts
-        })
+    # Sort by combined_points DESC
+    sorted_matches = sorted(all_matches, key=lambda x: -x["combined_points"])
 
-    # Find top Goondesliga match
-    top_goon = max((m for m in all_matches if m["division"] == "Goondesliga"), key=lambda m: m["combined_points"])
+    if not sorted_matches:
+        return "⚠️ No match data found for this week's TV guide."
 
-    # Sort all matches by total points
-    all_matches.sort(key=lambda m: m["combined_points"], reverse=True)
+    # First match from Goondesliga gets top billing on FSG
+    fsg_match = next((m for m in sorted_matches if m["division"] == "Goondesliga"), None)
+    if not fsg_match:
+        return "⚠️ No Goondesliga match found for FSG broadcast."
 
-    output = ["📺 This week’s Goondesliga & Spoondesliga TV schedule:\n"]
-    assigned_channels = set()
-    for i, match in enumerate(all_matches):
-        if match == top_goon:
-            channel = "FSG"
-        else:
-            for ch in channels:
-                if ch != "FSG" and ch not in assigned_channels:
-                    channel = ch
-                    break
-        assigned_channels.add(channel)
-        prefix = "🔴" if channel == "FSG" else "⚪"
-        line = f"{prefix} {channel}: {match['home']} vs {match['away']} (Combined: {match['combined_points']} pts)"
-        output.append(line)
+    output_lines = ["📺 This week’s Goondesliga & Spoondesliga TV schedule:\n"]
 
-    return "\n".join(output)
+    used = set()
+    output_lines.append(f"🔴 FSG: {fsg_match['match']} (Combined: {fsg_match['combined_points']} pts)")
+    used.add(fsg_match["match"])
+
+    # Assign remaining channels
+    channel_index = 1
+    for match in sorted_matches:
+        if match["match"] in used:
+            continue
+        if channel_index >= len(channels):
+            break
+        output_lines.append(f"⚪ {channels[channel_index]}: {match['match']} (Combined: {match['combined_points']} pts)")
+        channel_index += 1
+
+    return "\n".join(output_lines)
 
 @app.route("/", methods=["GET"])
 def index():
