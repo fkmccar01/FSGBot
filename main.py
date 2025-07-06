@@ -555,7 +555,7 @@ def generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_stan
     output_lines = ["📺 This week’s Goondesliga & Spoondesliga TV schedule:\n"]
 
     used = set()
-    output_lines.append(f"🔴 FSG: {fsg_match['match']} (Combined: {fsg_match['combined_points']} pts)")
+    output_lines.append(f"FSG Marquee Matchup: {fsg_match['match']} (Combined: {fsg_match['combined_points']} pts)")
     used.add(fsg_match["match"])
 
     # Assign remaining channels
@@ -565,7 +565,7 @@ def generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_stan
             continue
         if channel_index >= len(channels):
             break
-        output_lines.append(f"⚪ {channels[channel_index]}: {match['match']} (Combined: {match['combined_points']} pts)")
+        output_lines.append(f"{channels[channel_index]}: {match['match']} (Combined: {match['combined_points']} pts)")
         channel_index += 1
 
     return "\n".join(output_lines)
