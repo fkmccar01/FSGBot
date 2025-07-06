@@ -702,16 +702,7 @@ def groupme_webhook():
     
             # 🔁 UPDATED FIXTURE SCRAPING
             goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
-            spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
-    
-            tv_schedule = generate_tv_schedule_from_upcoming(
-                goon_fixtures, spoon_fixtures,
-                goon_standings, spoon_standings
-            )
-    
-            send_groupme_message(tv_schedule)  # ✅ Moved inside the if-block
-    
-            return "ok", 200
+            spoon
 
         return "ok", 200
 
