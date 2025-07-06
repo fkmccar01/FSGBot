@@ -250,10 +250,9 @@ def call_gemini_api(prompt):
 
 import re
 
-def parse_player_grades(soup):
+def parse_player_grades(soup, home_team_name, away_team_name):
     players = []
-
-    # Home team
+    # Home team players
     home_rows = soup.select('#ctl00_cphMain_dgHomeLineUp tr.ItemStyle, #ctl00_cphMain_dgHomeLineUp tr.AlternatingItemStyle')
     for row in home_rows:
         pos_tag = row.find("span", id=lambda x: x and "lblHomepos" in x)
@@ -263,13 +262,13 @@ def parse_player_grades(soup):
             match = re.search(r"Grade:\s*(\d+)", title)
             grade = int(match.group(1)) if match else None
             players.append({
-                "team": "home",
+                "team": home_team_name,
                 "position": pos_tag.text.strip(),
                 "name": name_tag.text.strip(),
                 "grade": grade
             })
 
-    # Away team
+    # Away team players
     away_rows = soup.select('#ctl00_cphMain_dgAwayLineUp tr.ItemStyle, #ctl00_cphMain_dgAwayLineUp tr.AlternatingItemStyle')
     for row in away_rows:
         pos_tag = row.find("span", id=lambda x: x and "lblAwaypos" in x)
@@ -279,12 +278,11 @@ def parse_player_grades(soup):
             match = re.search(r"Grade:\s*(\d+)", title)
             grade = int(match.group(1)) if match else None
             players.append({
-                "team": "away",
+                "team": away_team_name,
                 "position": pos_tag.text.strip(),
                 "name": name_tag.text.strip(),
                 "grade": grade
             })
-
     return players
 
 import re
@@ -355,7 +353,7 @@ def scrape_and_summarize_by_game_id(game_id):
             return "[Failed to retrieve match page.]"
 
         soup = BeautifulSoup(match_html, "html.parser")
-        player_grades = parse_player_grades(soup)
+        player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
         match_data = parse_match_data(soup)
         events = parse_match_events(soup)
 
@@ -410,7 +408,7 @@ def get_match_summary_and_grades(game_id):
             return "[Failed to retrieve match page.]", []
 
         soup = BeautifulSoup(match_html, "html.parser")
-        player_grades = parse_player_grades(soup)
+        player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
         match_data = parse_match_data(soup)
         events = parse_match_events(soup)
 
@@ -641,7 +639,7 @@ def groupme_webhook():
 
             soup = BeautifulSoup(match_html, "html.parser")
             match_data = parse_match_data(soup)
-            player_grades = parse_player_grades(soup)
+            player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
 
             score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
             match_scores.append(score_line)
@@ -649,7 +647,7 @@ def groupme_webhook():
             rated_players = [p for p in player_grades if p["grade"] is not None]
             if rated_players:
                 top_player = sorted(rated_players, key=lambda x: -x["grade"])[0]
-                top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊), {top_player['team']}")
+                top_players.append(f"{top_player['name']} ({top_player['position']}, {top_player['grade']} 📊, {top_player['team']}")
 
         # Use the logged-in session to scrape standings
         standings = scrape_league_standings_with_login(session, league_url)
