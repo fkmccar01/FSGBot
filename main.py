@@ -508,67 +508,70 @@ def generate_standings_summary(standings):
 
     return summary.strip()
 
-def generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings):
-    channels = [
-        "FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Kids",
-    ]
+def scrape_upcoming_fixtures(url):
+    response = requests.get(url)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Failed to fetch upcoming fixtures page: {response.status_code}\n")
+        return []
+    soup = BeautifulSoup(response.text, "html.parser")
+    fixtures = []
+    rows = soup.select("#ctl00_cphMain_dgUpcoming tr")
+    for row in rows:
+        onclick = row.get("onclick", "")
+        match = re.search(r"GameID=(\\d+)", onclick)
+        if not match:
+            continue
+        game_id = match.group(1)
+        tds = row.find_all("td")
+        if len(tds) >= 4:
+            home = tds[1].get_text(strip=True)
+            away = tds[3].get_text(strip=True)
+            fixtures.append({"home_team": home, "away_team": away, "game_id": game_id})
+    return fixtures
 
-    # Create point lookup from standings
-    points_map = {}
-    for team in goon_standings + spoon_standings:
-        points_map[normalize(team["team"])] = team["points"]
-
+def generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_standings, spoon_standings):
+    channels = ["FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Kids"]
+    points_map = {normalize(team["team"]): team["points"] for team in goon_standings + spoon_standings}
     all_matches = []
-    for match in goon_matches + spoon_matches:
+    for match in goon_fixtures + spoon_fixtures:
         home = normalize(match["home_team"])
         away = normalize(match["away_team"])
-
-        home_points = points_map.get(home)
-        away_points = points_map.get(away)
-
-        # If any team is missing, default to 0 points
-        if home_points is None:
-            sys.stderr.write(f"⚠️ Missing home team in standings: {match['home_team']}\n")
-            home_points = 0
-        if away_points is None:
-            sys.stderr.write(f"⚠️ Missing away team in standings: {match['away_team']}\n")
-            away_points = 0
-
+        home_points = points_map.get(home, 0)
+        away_points = points_map.get(away, 0)
         combined = home_points + away_points
         all_matches.append({
             "match": f"{match['home_team']} vs {match['away_team']}",
             "combined_points": combined,
-            "division": "Goondesliga" if match in goon_matches else "Spoondesliga"
+            "division": "Goondesliga" if match in goon_fixtures else "Spoondesliga"
         })
-
-    # Sort by combined_points DESC
     sorted_matches = sorted(all_matches, key=lambda x: -x["combined_points"])
-
     if not sorted_matches:
-        return "⚠️ No match data found for this week's TV guide."
-
-    # First match from Goondesliga gets top billing on FSG
-    fsg_match = next((m for m in sorted_matches if m["division"] == "Goondesliga"), None)
-    if not fsg_match:
-        return "⚠️ No Goondesliga match found for FSG broadcast."
-
-    output_lines = ["📺 This week’s Goondesliga & Spoondesliga TV schedule:\n"]
-
-    used = set()
-    output_lines.append(f"FSG Marquee Matchup: {fsg_match['match']} (Combined: {fsg_match['combined_points']} pts)")
-    used.add(fsg_match["match"])
-
-    # Assign remaining channels
-    channel_index = 1
+        return "⚠️ No upcoming matches found."
+    marquee = next((m for m in sorted_matches if m["division"] == "Goondesliga"), None)
+    output = ["📺 FoxSportsGoon TV Kzhedule ⚽\n"]
+    if marquee:
+        output.append(f"🔴 FSG Marquee Matchup: {marquee['match']} (Combined: {marquee['combined_points']} pts)")
+    used = {marquee["match"]} if marquee else set()
+    i = 1
     for match in sorted_matches:
-        if match["match"] in used:
+        if match["match"] in used or i >= len(channels):
             continue
-        if channel_index >= len(channels):
-            break
-        output_lines.append(f"{channels[channel_index]}: {match['match']} (Combined: {match['combined_points']} pts)")
-        channel_index += 1
+        output.append(f"⚪ {channels[i]}: {match['match']} (Combined: {match['combined_points']} pts)")
+        i += 1
+    return "\n".join(output)
 
-    return "\n".join(output_lines)
+@app.route("/tv", methods=["POST"])
+def manual_tv_schedule():
+    session = get_logged_in_session()
+    if not session:
+        return send_groupme_message("⚠️ Couldn't log in to X11"), 200
+    goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+    spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+    goon_fixtures = scrape_upcoming_fixtures(GOON_FIXTURES_URL)
+    spoon_fixtures = scrape_upcoming_fixtures(SPOON_FIXTURES_URL)
+    tv_text = generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_standings, spoon_standings)
+    send_groupme_message(tv_text[:1500])
+    return "ok", 200
 
 @app.route("/", methods=["GET"])
 def index():
