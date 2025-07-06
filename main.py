@@ -689,7 +689,7 @@ def groupme_webhook():
             goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
             spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
 
-            tv_schedule = generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings)
+            tv_schedule = generate_tv_schedule_from_upcoming(goon_matches, spoon_matches, goon_standings, spoon_standings)
             send_groupme_message(tv_schedule[:1500])
             return "ok", 200
     
