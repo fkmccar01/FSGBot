@@ -708,12 +708,12 @@ def groupme_webhook():
                 goon_fixtures, spoon_fixtures,
                 goon_standings, spoon_standings
             )
-
-        send_groupme_message(tv_schedule)
+    
+            send_groupme_message(tv_schedule)  # ✅ Moved inside the if-block
+    
+            return "ok", 200
 
         return "ok", 200
-
-    return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
