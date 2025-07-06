@@ -510,8 +510,7 @@ def generate_standings_summary(standings):
 
 def generate_tv_schedule(goon_matches, spoon_matches, goon_standings, spoon_standings):
     channels = [
-        "FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Deportes",
-        "FSG Xtra", "FSG Max", "FSG On Demand", "FSG After Dark", "FSG Public Access", "FSG Kids"
+        "FSG", "FSG2", "FSG3", "FSG+", "FSG Radio", "FSG Kids",
     ]
 
     # Create point lookup from standings
