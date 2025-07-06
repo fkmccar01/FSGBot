@@ -567,8 +567,8 @@ def manual_tv_schedule():
         return send_groupme_message("⚠️ Couldn't log in to X11"), 200
     goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
     spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-    goon_fixtures = scrape_upcoming_fixtures(GOON_FIXTURES_URL)
-    spoon_fixtures = scrape_upcoming_fixtures(SPOON_FIXTURES_URL)
+    goon_fixtures = scrape_upcoming_fixtures(GOONDESLIGA_URL)
+    spoon_fixtures = scrape_upcoming_fixtures(SPOONDESLIGA_URL)
     tv_text = generate_tv_schedule(goon_fixtures, spoon_fixtures, goon_standings, spoon_standings)
     send_groupme_message(tv_text[:1500])
     return "ok", 200
