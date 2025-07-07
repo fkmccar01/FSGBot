@@ -864,27 +864,23 @@ def groupme_webhook():
 
     # 🟣 4. Handle Match Preview Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "preview" in text_lower:
-        # Extract team name from message (attempt)
         resolved_team = resolve_team_name(text, team_mapping)
         send_groupme_message("Preview? We talkin' 'bout previews? Jk y'all, let's get it...")
         if not resolved_team:
             send_groupme_message("Sorry, I couldn't find that team in my records.")
             return "ok", 200
-    
+
         session = get_logged_in_session()
         if not session:
             send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
             return "ok", 200
     
-        # Get standings for both leagues
         goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
         spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
     
-        # Find upcoming fixtures
         goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
         spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
     
-        # Look for upcoming match involving resolved_team
         upcoming_match = None
         for match in goon_fixtures + spoon_fixtures:
             if normalize(match["home_team"]) == normalize(resolved_team) or normalize(match["away_team"]) == normalize(resolved_team):
@@ -894,12 +890,11 @@ def groupme_webhook():
         if not upcoming_match:
             send_groupme_message(f"Sorry, I couldn't find an upcoming match for {resolved_team}.")
             return "ok", 200
-    
-        # Generate preview
-        preview_text = generate_match_preview(session, upcoming_match, goon_standings, spoon_standings)
-        send_groupme_message(preview_text[:1500])  # limit message size to 1500 chars
-        return "ok", 200
 
+    league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]  # <--- add this line
+
+    preview_text = generate_match_preview(session, upcoming_match, goon_standings, spoon_standings, league_urls)  # <--- pass league_urls
+    send_groupme_message(preview_text[:1500])
     return "ok", 200
 
 if __name__ == "__main__":
