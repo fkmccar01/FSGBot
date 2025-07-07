@@ -454,7 +454,7 @@ def scrape_league_standings_with_login(session, league_url):
     standings = []
     for row in rows:
         cols = row.find_all("td")
-        if len(cols) < 10:
+        if len(cols) < 12:  # adjust if your table has 12+ columns
             continue
         # Debug print all columns for this row
         sys.stderr.write(f"STANDINGS ROW COLS: {[col.text.strip() for col in cols]}\n")
@@ -462,25 +462,32 @@ def scrape_league_standings_with_login(session, league_url):
             place = int(cols[0].text.strip().strip("."))
             team_link = cols[2].find("a")
             team_name = team_link.text.strip() if team_link else cols[2].text.strip()  # fallback to text if no <a>
-            
-            # Parse GF and GA from cols[9], format like "9 - 2"
+
+            # Parse GF and GA from the "GF - GA" column (usually index 9)
             gf_ga_text = cols[9].text.strip()
-            gf_str, ga_str = gf_ga_text.split("-")
-            gf = int(gf_str.strip())
-            ga = int(ga_str.strip())
-            
+            # Split by " - " or "-"
+            if " - " in gf_ga_text:
+                gf_text, ga_text = gf_ga_text.split(" - ")
+            elif "-" in gf_ga_text:
+                gf_text, ga_text = gf_ga_text.split("-")
+            else:
+                raise ValueError(f"Unexpected GF-GA format: {gf_ga_text}")
+
+            gf = int(gf_text.strip())
+            ga = int(ga_text.strip())
+
             diff_text = cols[10].text.strip().replace("+", "")
             diff = int(diff_text)
-            
+
             points = int(cols[11].text.strip())
 
             standings.append({
                 "place": place,
                 "team": team_name,
-                "gf": gf,
-                "ga": ga,
+                "points": points,
                 "diff": diff,
-                "points": points
+                "gf": gf,
+                "ga": ga
             })
         except Exception as e:
             sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
