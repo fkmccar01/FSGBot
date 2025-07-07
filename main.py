@@ -636,9 +636,8 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
     prompt = (
         f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
         f"Talk in a slight African American accent.\n"
-        f"Always keep your previews between 990-1000 characters. Never go above 1000.\n"
-        f"Use the current league standings (place, wins, draws, losses, goals for, goals against, goal difference, and points) as context for your analysis.\n"
-        f"If a team did not play last round, assume they were on a bye week and mention that.\n"
+        f"Always keep your previews between 990-1000 characters.\n"
+        f"Give the current league standings context for both teams, including place, wins, draws, losses, goals for, goals against, goal difference, and points.\n"
         f"Include recent form based on the last match result and key player performances.\n"
         f"Make predictions and build excitement for the upcoming game.\n"
         f"Use full player names and include player ratings where relevant.\n"
@@ -668,54 +667,56 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
 def filter_players_for_team(player_grades, team_name):
     return [p for p in player_grades if p['team'] == team_name]
 
-def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings, league_urls):
+def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings):
     """
-    Generates a match preview text for an upcoming match.
-    Handles cases where one or both teams may be on a bye week (no last match).
+    session: logged-in requests.Session()
+    upcoming_match: dict with home_team, away_team, game_id
+    goon_standings/spoon_standings: lists of dicts from standings scraping
     """
 
-    home_team = upcoming_match["home_team"]
-    away_team = upcoming_match["away_team"]
+    # Find standings for each team in either league
+    all_standings = goon_standings + spoon_standings
+    home_standings = find_team_standing(upcoming_match["home_team"], all_standings)
+    away_standings = find_team_standing(upcoming_match["away_team"], all_standings)
 
-    # Get last matches safely (could be None if bye week)
-    home_last_match = get_last_match_for_team(home_team, league_urls)
-    away_last_match = get_last_match_for_team(away_team, league_urls)
+    league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
 
-    # Defensive: if both teams have no last match info
-    if not home_last_match and not away_last_match:
-        # Just do a preview based on standings only
-        home_standing = find_team_standing(goon_standings, home_team) or find_team_standing(spoon_standings, home_team)
-        away_standing = find_team_standing(goon_standings, away_team) or find_team_standing(spoon_standings, away_team)
+    # Get last match for each team
+    home_last_match = get_last_match_for_team(upcoming_match["home_team"], league_urls)
+    away_last_match = get_last_match_for_team(upcoming_match["away_team"], league_urls)
 
-        prompt = format_gemini_match_preview_prompt(
-            home_standing,
-            away_standing,
-            team1_last_match=None,  # for home team
-            team2_last_match=None,  # for away team
-        )
-        return call_gemini_api(prompt)
+    # Defensive checks
+    if not home_last_match or not away_last_match:
+        return "Sorry, couldn't find last match info for both teams."
 
-    # If at least one last match found, gather data for each team or None
-    home_match_data = get_match_summary_and_grades(home_last_match["game_id"]) if home_last_match else (None, None, None)
-    away_match_data = get_match_summary_and_grades(away_last_match["game_id"]) if away_last_match else (None, None, None)
+    # Get last match details for home team
+    summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
 
-    home_standing = find_team_standing(goon_standings, home_team) or find_team_standing(spoon_standings, home_team)
-    away_standing = find_team_standing(goon_standings, away_team) or find_team_standing(spoon_standings, away_team)
+    # Get last match details for away team
+    summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
 
-    prompt = format_gemini_match_preview_prompt(
-        home_standing,
-        away_standing,
-        {
-            "match_data": home_last_match,
-            "player_grades": home_match_data[1] or [],
-        } if home_last_match else None,
-        {
-            "match_data": away_last_match,
-            "player_grades": away_match_data[1] or [],
-        } if away_last_match else None,
-    )
+    # Filter player grades for the correct team only
+    team1_name = home_standings['team']
+    team2_name = away_standings['team']
 
-    return call_gemini_api(prompt)
+    team1_player_grades = filter_players_for_team(player_grades_home_all, team1_name)
+    team2_player_grades = filter_players_for_team(player_grades_away_all, team2_name)
+
+    team1_last_match = {
+        "match_data": match_data_home,
+        "player_grades": team1_player_grades
+    }
+    team2_last_match = {
+        "match_data": match_data_away,
+        "player_grades": team2_player_grades
+    }
+
+    # Format prompt
+    prompt = format_gemini_match_preview_prompt(home_standings, away_standings, team1_last_match, team2_last_match)
+
+    # Call Gemini
+    preview_text = call_gemini_api(prompt)
+    return preview_text
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
