@@ -636,7 +636,7 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Use the current league standings (place, wins, draws, losses, goals for, goals against, goal difference, and points) as context for your analysis.\n"
         f"Include recent form based on the last match result and key player performances.\n"
         f"Make predictions and build excitement for the upcoming game.\n"
-        f"Use full player names and include player ratings where relevant.\n"
+        f"Use full player names and their performance rating in the format (position, grade 📊) the first time they are mentioned when relevant.\n.\n"
         f"Keep it engaging as a TV preview.\n\n"
         f"If a team has no recent match, they had a bye round, just use standings in your analysis for them.\n\n"
     )
