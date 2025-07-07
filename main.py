@@ -628,6 +628,13 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
     team2_players = team2_last_match['player_grades']
 
     prompt = (
+        f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
+        f"Talk in a slight African American accent.\n"
+        f"Give the current league standings context for both teams, including place, wins, draws, losses, goals for, goals against, goal difference, and points.\n"
+        f"Include recent form based on the last match result and key player performances.\n"
+        f"Make predictions and build excitement for the upcoming game.\n"
+        f"Use full player names and include player ratings where relevant.\n"
+        f"Keep it concise and engaging as a TV preview.\n\n"
         f"Team 1: {team1_standings['team']}\n"
         f"Place: {team1_standings['place']}, W-D-L: {team1_standings['wins']}-{team1_standings['draws']}-{team1_standings['losses']}, "
         f"GF-GA-Diff: {team1_standings['gf']}-{team1_standings['ga']}-{team1_standings['diff']}, Points: {team1_standings['points']}\n"
