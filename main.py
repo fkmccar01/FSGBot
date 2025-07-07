@@ -861,6 +861,7 @@ def groupme_webhook():
     if any(bot_name in text_lower for bot_name in bot_aliases) and "preview" in text_lower:
         # Extract team name from message (attempt)
         resolved_team = resolve_team_name(text, team_mapping)
+        send_groupme_message("Preview? We talking about previews? Jk y'all, let's get it...")
         if not resolved_team:
             send_groupme_message("Sorry, I couldn't find that team in my records.")
             return "ok", 200
