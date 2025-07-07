@@ -637,6 +637,7 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Talk in a slight African American accent.\n"
         f"Always keep your previews between 990-1000 characters. Never go above 1000.\n"
         f"Use the current league standings (place, wins, draws, losses, goals for, goals against, goal difference, and points) as context for your analysis.\n"
+        f"If a team did not play last round, assume they were on a bye week and mention that.\n"
         f"Include recent form based on the last match result and key player performances.\n"
         f"Make predictions and build excitement for the upcoming game.\n"
         f"Use full player names and include player ratings where relevant.\n"
@@ -685,8 +686,10 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
     away_last_match = get_last_match_for_team(upcoming_match["away_team"], league_urls)
 
     # Defensive checks
-    if not home_last_match or not away_last_match:
-        return "Sorry, couldn't find last match info for both teams."
+    if not team1_last_match and not team2_last_match:
+    return "Sorry, couldn't find last match info for either team."
+
+    # allow the preview if at least one team has data
 
     # Get last match details for home team
     summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
