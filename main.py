@@ -894,7 +894,7 @@ def groupme_webhook():
                 break
     
         if not upcoming_match:
-            send_groupme_message(f"Sorry, I couldn't find an upcoming match for {resolved_team}.")
+            send_groupme_message(f"Hold on now...stay off the taaaaaar! {resolved_team} has a bye.")
             return "ok", 200
     
         # Generate preview
