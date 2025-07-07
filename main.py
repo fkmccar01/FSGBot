@@ -638,7 +638,7 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Make predictions and build excitement for the upcoming game.\n"
         f"Use full player names and include player ratings where relevant.\n"
         f"Keep it engaging as a TV preview.\n\n"
-        f"If a team has no recent match, they are coming off a bye, just use standings in your analysis for them.\n\n"
+        f"If a team has no recent match, they had a bye round, just use standings in your analysis for them.\n\n"
     )
 
     # Team 1 info
