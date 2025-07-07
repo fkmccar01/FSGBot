@@ -500,7 +500,7 @@ def generate_standings_summary(standings, league_name):
         return "Standings data is missing."
 
     # Sort by points (desc), then goal diff (desc), then name
-    standings = sorted(standings, key=lambda x: (-x["points"], -x["gd"], x["team"]))
+    standings = sorted(standings, key=lambda x: (-x["points"], -x["diff"], x["team"]))
     summary = ""
 
     # 🏆 True leader based on tiebreakers
