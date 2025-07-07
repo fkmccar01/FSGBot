@@ -856,7 +856,7 @@ def groupme_webhook():
     if any(bot_name in text_lower for bot_name in bot_aliases):
         if "fsg" or "tv" in text_lower and any(kw in text_lower for kw in ["tv", "on", "kzhedule", "schedule", "guide", "games"]):
             sys.stderr.write("✅ Triggered TV schedule command.\n")
-            send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon this week...")
+            send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon...")
     
             session = get_logged_in_session()
             if not session:
