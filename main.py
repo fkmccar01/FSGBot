@@ -594,6 +594,112 @@ def generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_stand
         i += 1
     return "\n".join(output)
 
+def get_last_match_for_team(team_name, league_urls):
+    """
+    Given a normalized team_name and list of league URLs,
+    returns the most recent match dict with keys home_team, away_team, game_id.
+    """
+    normalized_team = normalize(team_name)
+    for league_url in league_urls:
+        matches = get_latest_game_ids_from_league(league_url)
+        # Find matches where this team was involved, assume matches are sorted most recent first
+        for match in matches:
+            if normalize(match["home_team"]) == normalized_team or normalize(match["away_team"]) == normalized_team:
+                return match
+    return None
+
+def find_team_standing(team_name, standings):
+    normalized_team = normalize(team_name)
+    for entry in standings:
+        if normalize(entry["team"]) == normalized_team:
+            return entry
+    return None
+
+def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
+    """
+    team1_standings/team2_standings: dict from standings list
+    team1_last_match/team2_last_match: dict with keys: match_data, player_grades
+    """
+    prompt = (
+        f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
+        f"Talk in a slight African American accent.\n"
+        f"For your preview, take into account league standings context for both teams, including place, wins, draws, losses, goals for, goals against, goal difference, and points.\n"
+        f"Include recent form based on the last match result and key player performances in your analysis.\n"
+        f"Make predictions and build excitement for the upcoming game.\n"
+        f"Use full player names and include player ratings where relevant.\n"
+        f"Keep it concise and engaging as a TV preview.\n\n"
+
+        f"Team 1: {team1_standings['team']}\n"
+        f"Place: {team1_standings['place']}, W-D-L: {team1_standings['wins']}-{team1_standings['draws']}-{team1_standings['losses']}, "
+        f"GF-GA-Diff: {team1_standings['gf']}-{team1_standings['ga']}-{team1_standings['diff']}, Points: {team1_standings['points']}\n"
+        f"Last match result: {team1_last_match['match_data']['home_team']} {team1_last_match['match_data']['home_score']}-{team1_last_match['match_data']['away_score']} {team1_last_match['match_data']['away_team']}\n"
+        f"Key players and ratings:\n"
+    )
+    for p in team1_last_match["player_grades"]:
+        if p["grade"] is not None:
+            prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
+
+    prompt += "\n"
+
+    prompt += (
+        f"Team 2: {team2_standings['team']}\n"
+        f"Place: {team2_standings['place']}, W-D-L: {team2_standings['wins']}-{team2_standings['draws']}-{team2_standings['losses']}, "
+        f"GF-GA-Diff: {team2_standings['gf']}-{team2_standings['ga']}-{team2_standings['diff']}, Points: {team2_standings['points']}\n"
+        f"Last match result: {team2_last_match['match_data']['home_team']} {team2_last_match['match_data']['home_score']}-{team2_last_match['match_data']['away_score']} {team2_last_match['match_data']['away_team']}\n"
+        f"Key players and ratings:\n"
+    )
+    for p in team2_last_match["player_grades"]:
+        if p["grade"] is not None:
+            prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
+
+    prompt += "\nGenerate a lively and insightful match preview considering the above.\n"
+    return prompt
+
+def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings):
+    """
+    session: logged-in requests.Session()
+    upcoming_match: dict with home_team, away_team, game_id
+    goon_standings/spoon_standings: lists of dicts from standings scraping
+    """
+
+    # Find standings for each team in either league
+    all_standings = goon_standings + spoon_standings
+    home_standings = find_team_standing(upcoming_match["home_team"], all_standings)
+    away_standings = find_team_standing(upcoming_match["away_team"], all_standings)
+
+    league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
+
+    # Get last match for each team
+    home_last_match = get_last_match_for_team(upcoming_match["home_team"], league_urls)
+    away_last_match = get_last_match_for_team(upcoming_match["away_team"], league_urls)
+
+    # Defensive checks
+    if not home_last_match or not away_last_match:
+        return "Sorry, couldn't find last match info for both teams."
+
+    # Get last match details for home team
+    summary_home, player_grades_home, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+
+    # Get last match details for away team
+    summary_away, player_grades_away, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
+
+    # Prepare input for Gemini prompt
+    team1_last_match = {
+        "match_data": match_data_home,
+        "player_grades": player_grades_home
+    }
+    team2_last_match = {
+        "match_data": match_data_away,
+        "player_grades": player_grades_away
+    }
+
+    # Format prompt
+    prompt = format_gemini_match_preview_prompt(home_standings, away_standings, team1_last_match, team2_last_match)
+
+    # Call Gemini
+    preview_text = call_gemini_api(prompt)
+    return preview_text
+
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
     session = get_logged_in_session()
@@ -739,6 +845,43 @@ def groupme_webhook():
             )
             send_groupme_message(tv_schedule)
             return "ok", 200
+
+    # 🟣 4. Handle Match Preview Requests
+    if any(bot_name in text_lower for bot_name in bot_aliases) and "preview" in text_lower:
+        # Extract team name from message (attempt)
+        resolved_team = resolve_team_name(text, team_mapping)
+        if not resolved_team:
+            send_groupme_message("Sorry, I couldn't find that team in my records.")
+            return "ok", 200
+    
+        session = get_logged_in_session()
+        if not session:
+            send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
+            return "ok", 200
+    
+        # Get standings for both leagues
+        goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+        spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+    
+        # Find upcoming fixtures
+        goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
+        spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+    
+        # Look for upcoming match involving resolved_team
+        upcoming_match = None
+        for match in goon_fixtures + spoon_fixtures:
+            if normalize(match["home_team"]) == normalize(resolved_team) or normalize(match["away_team"]) == normalize(resolved_team):
+                upcoming_match = match
+                break
+    
+        if not upcoming_match:
+            send_groupme_message(f"Sorry, I couldn't find an upcoming match for {resolved_team}.")
+            return "ok", 200
+    
+        # Generate preview
+        preview_text = generate_match_preview(session, upcoming_match, goon_standings, spoon_standings)
+        send_groupme_message(preview_text[:1500])  # limit message size to 1500 chars
+        return "ok", 200
 
     return "ok", 200
 
