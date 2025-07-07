@@ -629,10 +629,6 @@ def find_team_standing(team_name, standings):
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
-    # Use player_grades instead of players
-    team1_players = team1_last_match['player_grades']
-    team2_players = team2_last_match['player_grades']
-
     prompt = (
         f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
         f"Talk in a slight African American accent.\n"
@@ -642,27 +638,43 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Make predictions and build excitement for the upcoming game.\n"
         f"Use full player names and include player ratings where relevant.\n"
         f"Keep it engaging as a TV preview.\n\n"
+        f"If a team has no recent match, they are coming off a bye, just use standings in your analysis for them.\n\n"
+    )
+
+    # Team 1 info
+    prompt += (
         f"Team 1: {team1_standings['team']}\n"
         f"Place: {team1_standings['place']}, W-D-L: {team1_standings['wins']}-{team1_standings['draws']}-{team1_standings['losses']}, "
         f"GF-GA-Diff: {team1_standings['gf']}-{team1_standings['ga']}-{team1_standings['diff']}, Points: {team1_standings['points']}\n"
-        f"Last match result: {team1_last_match['match_data']['home_team']} {team1_last_match['match_data']['home_score']}-{team1_last_match['match_data']['away_score']} {team1_last_match['match_data']['away_team']}\n"
-        f"Key players and ratings:\n"
     )
-    for p in team1_players:
-        prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
+    if team1_last_match:
+        prompt += (
+            f"Last match result: {team1_last_match['match_data']['home_team']} "
+            f"{team1_last_match['match_data']['home_score']}-{team1_last_match['match_data']['away_score']} "
+            f"{team1_last_match['match_data']['away_team']}\n"
+            f"Key players and ratings:\n"
+        )
+        for p in team1_last_match['player_grades']:
+            prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
 
+    # Team 2 info
     prompt += (
         f"\nTeam 2: {team2_standings['team']}\n"
         f"Place: {team2_standings['place']}, W-D-L: {team2_standings['wins']}-{team2_standings['draws']}-{team2_standings['losses']}, "
         f"GF-GA-Diff: {team2_standings['gf']}-{team2_standings['ga']}-{team2_standings['diff']}, Points: {team2_standings['points']}\n"
-        f"Last match result: {team2_last_match['match_data']['home_team']} {team2_last_match['match_data']['home_score']}-{team2_last_match['match_data']['away_score']} {team2_last_match['match_data']['away_team']}\n"
-        f"Key players and ratings:\n"
     )
-    for p in team2_players:
-        prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
+    if team2_last_match:
+        prompt += (
+            f"Last match result: {team2_last_match['match_data']['home_team']} "
+            f"{team2_last_match['match_data']['home_score']}-{team2_last_match['match_data']['away_score']} "
+            f"{team2_last_match['match_data']['away_team']}\n"
+            f"Key players and ratings:\n"
+        )
+        for p in team2_last_match['player_grades']:
+            prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
 
     prompt += "\nGenerate a lively and insightful match preview considering the above.\n"
-    return prompt
+    return prompt.strip()
 
 def filter_players_for_team(player_grades, team_name):
     return [p for p in player_grades if p['team'] == team_name]
@@ -685,33 +697,34 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
     home_last_match = get_last_match_for_team(upcoming_match["home_team"], league_urls)
     away_last_match = get_last_match_for_team(upcoming_match["away_team"], league_urls)
 
-    # Defensive checks
-    if not home_last_match or not away_last_match:
-        return "Sorry, couldn't find last match info for both teams."
+    # If neither team has a last match, abort
+    if not home_last_match and not away_last_match:
+        return "Sorry, couldn't find any recent match info for either team."
+
+    team1_last_match = None
+    team2_last_match = None
 
     # Get last match details for home team
-    summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+    if home_last_match:
+        summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+        team1_name = home_standings['team']
+        team1_player_grades = filter_players_for_team(player_grades_home_all, team1_name)
+        team1_last_match = {
+            "match_data": match_data_home,
+            "player_grades": team1_player_grades
+        }
 
     # Get last match details for away team
-    summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
+    if away_last_match:
+        summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
+        team2_name = away_standings['team']
+        team2_player_grades = filter_players_for_team(player_grades_away_all, team2_name)
+        team2_last_match = {
+            "match_data": match_data_away,
+            "player_grades": team2_player_grades
+        }
 
-    # Filter player grades for the correct team only
-    team1_name = home_standings['team']
-    team2_name = away_standings['team']
-
-    team1_player_grades = filter_players_for_team(player_grades_home_all, team1_name)
-    team2_player_grades = filter_players_for_team(player_grades_away_all, team2_name)
-
-    team1_last_match = {
-        "match_data": match_data_home,
-        "player_grades": team1_player_grades
-    }
-    team2_last_match = {
-        "match_data": match_data_away,
-        "player_grades": team2_player_grades
-    }
-
-    # Format prompt
+    # Format prompt — this function must be okay with one or both last_match dicts being None
     prompt = format_gemini_match_preview_prompt(home_standings, away_standings, team1_last_match, team2_last_match)
 
     # Call Gemini
