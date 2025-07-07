@@ -44,17 +44,17 @@ def build_team_name_mapping(profiles):
         team = profile.get("team")
         aliases = profile.get("team_alias", [])
         if team:
-            mapping[normalize(team.lower())] = team
+            mapping[normalize(team)] = team
             for alias in aliases:
-                mapping[normalize(alias.lower())] = team
+                mapping[normalize(alias)] = team
     return mapping
 
 team_mapping = build_team_name_mapping(profiles)
 
 def resolve_team_name(text, team_mapping):
-    text = text.strip().lower()
+    text_norm = normalize(text)
     for alias, official_name in team_mapping.items():
-        if alias in normalize(text):
+        if alias == text_norm:
             return official_name
     return None
 
@@ -631,9 +631,9 @@ def find_team_standing(team_name, standings):
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
-    # Use player_grades instead of players
-    team1_players = team1_last_match['player_grades']
-    team2_players = team2_last_match['player_grades']
+    # Defensive: If player_grades missing, set empty list to avoid crashes
+    team1_players = team1_last_match.get('player_grades', []) if team1_last_match else []
+    team2_players = team2_last_match.get('player_grades', []) if team2_last_match else []
 
     prompt = (
         f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
@@ -645,23 +645,20 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Make predictions and build excitement for the upcoming game.\n"
         f"Use full player names and include player ratings where relevant.\n"
         f"Keep it engaging as a TV preview.\n\n"
-        f"Team 1: {team1_standings['team']}\n"
-        f"Place: {team1_standings['place']}, W-D-L: {team1_standings['wins']}-{team1_standings['draws']}-{team1_standings['losses']}, "
-        f"GF-GA-Diff: {team1_standings['gf']}-{team1_standings['ga']}-{team1_standings['diff']}, Points: {team1_standings['points']}\n"
-        f"Last match result: {team1_last_match['match_data']['home_team']} {team1_last_match['match_data']['home_score']}-{team1_last_match['match_data']['away_score']} {team1_last_match['match_data']['away_team']}\n"
-        f"Key players and ratings:\n"
+        f"Team 1: {team1_standings.get('team', 'N/A')}\n"
+        f"Place: {team1_standings.get('place', 'N/A')}, W-D-L: {team1_standings.get('wins', 0)}-{team1_standings.get('draws', 0)}-{team1_standings.get('losses', 0)}, "
+        f"GF-GA-Diff: {team1_standings.get('gf', 0)}-{team1_standings.get('ga', 0)}-{team1_standings.get('diff', 0)}, Points: {team1_standings.get('points', 0)}\n"
     )
 
-    # Team 1 section
-    prompt += f"Team 1: {team1_standings.get('team', 'N/A')}\n"
-    prompt += f"Place: {team1_standings.get('place', 'N/A')}, W-D-L: {team1_standings.get('wins', 0)}-{team1_standings.get('draws', 0)}-{team1_standings.get('losses', 0)}, "
-    prompt += f"GF-GA-Diff: {team1_standings.get('gf', 0)}-{team1_standings.get('ga', 0)}-{team1_standings.get('diff', 0)}, Points: {team1_standings.get('points', 0)}\n"
-
-    if team1_last_match:
+    if team1_last_match and isinstance(team1_last_match, dict):
         md = team1_last_match.get('match_data', {})
-        prompt += f"Last match result: {md.get('home_team', 'N/A')} {md.get('home_score', '?')}-{md.get('away_score', '?')} {md.get('away_team', 'N/A')}\n"
+        home_team = md.get('home_team', 'N/A')
+        away_team = md.get('away_team', 'N/A')
+        home_score = md.get('home_score', '?')
+        away_score = md.get('away_score', '?')
+        prompt += f"Last match result: {home_team} {home_score}-{away_score} {away_team}\n"
         prompt += "Key players and ratings:\n"
-        for p in team1_last_match.get('player_grades', []):
+        for p in team1_players:
             grade = p.get('grade')
             if grade is not None:
                 prompt += f"- {p.get('name', 'Unknown')} ({p.get('position', '?')}, {grade} 📊)\n"
@@ -670,16 +667,21 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
 
     prompt += "\n"
 
-    # Team 2 section (same logic)
-    prompt += f"Team 2: {team2_standings.get('team', 'N/A')}\n"
-    prompt += f"Place: {team2_standings.get('place', 'N/A')}, W-D-L: {team2_standings.get('wins', 0)}-{team2_standings.get('draws', 0)}-{team2_standings.get('losses', 0)}, "
-    prompt += f"GF-GA-Diff: {team2_standings.get('gf', 0)}-{team2_standings.get('ga', 0)}-{team2_standings.get('diff', 0)}, Points: {team2_standings.get('points', 0)}\n"
+    prompt += (
+        f"Team 2: {team2_standings.get('team', 'N/A')}\n"
+        f"Place: {team2_standings.get('place', 'N/A')}, W-D-L: {team2_standings.get('wins', 0)}-{team2_standings.get('draws', 0)}-{team2_standings.get('losses', 0)}, "
+        f"GF-GA-Diff: {team2_standings.get('gf', 0)}-{team2_standings.get('ga', 0)}-{team2_standings.get('diff', 0)}, Points: {team2_standings.get('points', 0)}\n"
+    )
 
-    if team2_last_match:
+    if team2_last_match and isinstance(team2_last_match, dict):
         md = team2_last_match.get('match_data', {})
-        prompt += f"Last match result: {md.get('home_team', 'N/A')} {md.get('home_score', '?')}-{md.get('away_score', '?')} {md.get('away_team', 'N/A')}\n"
+        home_team = md.get('home_team', 'N/A')
+        away_team = md.get('away_team', 'N/A')
+        home_score = md.get('home_score', '?')
+        away_score = md.get('away_score', '?')
+        prompt += f"Last match result: {home_team} {home_score}-{away_score} {away_team}\n"
         prompt += "Key players and ratings:\n"
-        for p in team2_last_match.get('player_grades', []):
+        for p in team2_players:
             grade = p.get('grade')
             if grade is not None:
                 prompt += f"- {p.get('name', 'Unknown')} ({p.get('position', '?')}, {grade} 📊)\n"
