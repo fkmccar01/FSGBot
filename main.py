@@ -805,7 +805,7 @@ def format_match_odds_entry(match):
             f"GD: {team_standing['diff']}, Points: {team_standing['points']}."
         )
         if last_match:
-            result = last_match["match_data"]["result"]
+            result = last_match["match_data"].get("result", "No result available")
             grades = last_match["player_grades"]
             grade_str = ", ".join([f"{p['name']} ({p['position']}, {p['grade']}📊)" for p in grades])
             summary += f" Last result: {result}. Key players: {grade_str}."
