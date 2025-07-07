@@ -623,28 +623,29 @@ def find_team_standing(team_name, standings):
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
-    """
-    team1_standings/team2_standings: dict from standings list
-    team1_last_match/team2_last_match: dict with keys: match_data, player_grades
-    """
-    prompt = (
-        f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
-        f"Talk in a slight African American accent.\n"
-        f"For your preview, take into account league standings context for both teams, including place, wins, draws, losses, goals for, goals against, goal difference, and points.\n"
-        f"Include recent form based on the last match result and key player performances in your analysis.\n"
-        f"Make predictions and build excitement for the upcoming game.\n"
-        f"Use full player names and include player ratings where relevant.\n"
-        f"Keep it concise and engaging as a TV preview.\n\n"
+    # Extract player lists separately
+    team1_players = team1_last_match['players']  # filtered to team1 only
+    team2_players = team2_last_match['players']  # filtered to team2 only
 
+    prompt = (
         f"Team 1: {team1_standings['team']}\n"
         f"Place: {team1_standings['place']}, W-D-L: {team1_standings['wins']}-{team1_standings['draws']}-{team1_standings['losses']}, "
         f"GF-GA-Diff: {team1_standings['gf']}-{team1_standings['ga']}-{team1_standings['diff']}, Points: {team1_standings['points']}\n"
         f"Last match result: {team1_last_match['match_data']['home_team']} {team1_last_match['match_data']['home_score']}-{team1_last_match['match_data']['away_score']} {team1_last_match['match_data']['away_team']}\n"
         f"Key players and ratings:\n"
     )
-    for p in team1_last_match["player_grades"]:
-        if p["grade"] is not None:
-            prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
+    for p in team1_players:
+        prompt += f"- {p['full_name']} ({p['position']}, {p['rating']} 📊)\n"
+
+    prompt += (
+        f"\nTeam 2: {team2_standings['team']}\n"
+        f"Place: {team2_standings['place']}, W-D-L: {team2_standings['wins']}-{team2_standings['draws']}-{team2_standings['losses']}, "
+        f"GF-GA-Diff: {team2_standings['gf']}-{team2_standings['ga']}-{team2_standings['diff']}, Points: {team2_standings['points']}\n"
+        f"Last match result: {team2_last_match['match_data']['home_team']} {team2_last_match['match_data']['home_score']}-{team2_last_match['match_data']['away_score']} {team2_last_match['match_data']['away_team']}\n"
+        f"Key players and ratings:\n"
+    )
+    for p in team2_players:
+        prompt += f"- {p['full_name']} ({p['position']}, {p['rating']} 📊)\n"
 
     prompt += "\n"
 
