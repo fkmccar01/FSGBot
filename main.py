@@ -751,6 +751,48 @@ def manual_tv_schedule():
     send_groupme_message(tv_schedule)
     return "ok", 200
 
+def format_draftkzar_odds_prompt(goon_matches, spoon_matches):
+    prompt = (
+        "You are DraftKzar, a sharp oddsmaker for FoxSportsGoon.\n\n"
+        "Your job is to set **realistic moneyline betting odds** for upcoming Xpert Eleven matchups, based on:\n"
+        "- League standings (place, W-D-L, GF-GA-GD, points)\n"
+        "- Last match result\n"
+        "- Key player performance and form (player ratings)\n\n"
+        "Give odds in the format:\n"
+        "Team A (-200) vs Team B (+180)\n\n"
+        "Only use moneyline odds. Base odds on form, momentum, defense/offense trends, and talent.\n\n"
+        "DraftKzar's Betting Odds\n\n"
+        "Goondesliga\n"
+    )
+
+    for match in goon_matches:
+        prompt += format_match_odds_entry(match)
+
+    prompt += "\nSpoondesliga\n"
+    for match in spoon_matches:
+        prompt += format_match_odds_entry(match)
+
+    return prompt
+
+def format_match_odds_entry(match):
+    def format_team_block(team_standing, last_match):
+        summary = (
+            f"{team_standing['team']} — Place: {team_standing['place']}, "
+            f"W-D-L: {team_standing['wins']}-{team_standing['draws']}-{team_standing['losses']}, "
+            f"GD: {team_standing['diff']}, Points: {team_standing['points']}."
+        )
+        if last_match:
+            result = last_match["match_data"]["result"]
+            grades = last_match["player_grades"]
+            grade_str = ", ".join([f"{p['name']} ({p['position']}, {p['grade']}📊)" for p in grades])
+            summary += f" Last result: {result}. Key players: {grade_str}."
+        return summary
+
+    home = format_team_block(match["home_standing"], match["home_last_match"])
+    away = format_team_block(match["away_standing"], match["away_last_match"])
+
+    return f"{match['home_standing']['team']} vs {match['away_standing']['team']}\n{home}\n{away}\n\n"
+
 @app.route("/", methods=["GET"])
 def index():
     return "Taycan A. Schitt is alive!"
@@ -916,6 +958,47 @@ def groupme_webhook():
         return "ok", 200
 
     return "ok", 200
+
+    # 🟣 5. Handle Odds Requests
+    if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
+        send_groupme_message("Pullin' up the DraftKzar book... calculating odds and biases...")
+    
+        session = get_logged_in_session()
+        if not session:
+            send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch league data.")
+            return "ok", 200
+    
+        # Get standings
+        goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+        spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+        all_standings = goon_standings + spoon_standings
+    
+        # Get upcoming fixtures
+        goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
+        spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+    
+        # Build match entries
+        league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
+        goon_matches = []
+        spoon_matches = []
+    
+        for match in goon_fixtures:
+            enriched = enrich_match_with_data(match, all_standings, league_urls)
+            if enriched:
+                goon_matches.append(enriched)
+    
+        for match in spoon_fixtures:
+            enriched = enrich_match_with_data(match, all_standings, league_urls)
+            if enriched:
+                spoon_matches.append(enriched)
+    
+        # Build Gemini prompt
+        prompt = format_draftkzar_odds_prompt(goon_matches, spoon_matches)
+    
+        # Get Gemini response
+        odds_output = call_gemini_api(prompt)
+        send_groupme_message(odds_output[:1500])  # Gemini limit safety
+        return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
