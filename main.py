@@ -353,8 +353,10 @@ def scrape_and_summarize_by_game_id(game_id):
             return "[Failed to retrieve match page.]"
 
         soup = BeautifulSoup(match_html, "html.parser")
-        player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
+        
+        # FIXED: Parse match_data first before player grades
         match_data = parse_match_data(soup)
+        player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
         events = parse_match_events(soup)
 
         motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
@@ -408,8 +410,10 @@ def get_match_summary_and_grades(game_id):
             return "[Failed to retrieve match page.]", []
 
         soup = BeautifulSoup(match_html, "html.parser")
-        player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
+
+        # FIXED: Parse match_data before player_grades
         match_data = parse_match_data(soup)
+        player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
         events = parse_match_events(soup)
 
         motm_home = soup.find(id="ctl00_cphMain_hplBestHome")
@@ -475,7 +479,7 @@ def scrape_league_standings_with_login(session, league_url):
 
     return standings
 
-def generate_standings_summary(standings):
+def generate_standings_summary(standings, league_name):
     if not standings:
         return "Standings data is missing."
 
@@ -509,8 +513,6 @@ def generate_standings_summary(standings):
                 relegation.append(f"{team['team']} ({team['points']} pts)")
     if relegation:
         summary += f"\n📉 {bottom_watch_label}: {', '.join(relegation)}"
-
-    return summary.strip()
 
     return summary.strip()
 
@@ -582,16 +584,20 @@ def generate_tv_schedule_from_upcoming(goon_fixtures, spoon_fixtures, goon_stand
 def manual_tv_schedule():
     session = get_logged_in_session()
     if not session:
-        return send_groupme_message("⚠️ Couldn't log in to X11"), 200
+        send_groupme_message("⚠️ Couldn't log in to X11")
+        return "ok", 200
+
     goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
     spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
     goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
     spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+
     tv_schedule = generate_tv_schedule_from_upcoming(
-    goon_fixtures, spoon_fixtures,
-    goon_standings, spoon_standings
+        goon_fixtures, spoon_fixtures,
+        goon_standings, spoon_standings
     )
-    
+
+    send_groupme_message(tv_schedule)
     return "ok", 200
 
 @app.route("/", methods=["GET"])
@@ -661,7 +667,7 @@ def groupme_webhook():
         standings = scrape_league_standings_with_login(session, league_url)
 
         try:
-            standings_summary = generate_standings_summary(standings)
+            standings_summary = generate_standings_summary(standings, league_name)
         except Exception as e:
             sys.stderr.write(f"⚠️ Error parsing standings: {e}\n")
             standings_summary = "Standings data is missing."
@@ -696,22 +702,28 @@ def groupme_webhook():
 
     # 🟣 3. Handle TV Schedule Requests
     if any(bot_name in text_lower for bot_name in bot_aliases):
-        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "kzhedule", "schedule", "guide", "games"]):
-            sys.stderr.write("✅ Triggered TV schedule command.\n")
-            send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon this week...")
-    
-            session = get_logged_in_session()
-            if not session:
-                send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
-                return "ok", 200
-    
-            goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-            spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-    
-            # 🔁 UPDATED FIXTURE SCRAPING
-            goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
-            spoon
+    if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "kzhedule", "schedule", "guide", "games"]):
+        sys.stderr.write("✅ Triggered TV schedule command.\n")
+        send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon this week...")
 
+        session = get_logged_in_session()
+        if not session:
+            send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
+            return "ok", 200
+
+        goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+        spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+
+        # FIXED: Scrape fixtures fully
+        goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
+        spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+
+        # Generate and send TV schedule
+        tv_schedule = generate_tv_schedule_from_upcoming(
+            goon_fixtures, spoon_fixtures,
+            goon_standings, spoon_standings
+        )
+        send_groupme_message(tv_schedule)
         return "ok", 200
 
 if __name__ == "__main__":
