@@ -1040,7 +1040,7 @@ def groupme_webhook():
             enriched = enrich_match_with_data(match, all_standings, league_urls)
             if enriched:
                 goon_matches.append(enriched)
-         print("✅ Enriched Goondesliga:", len(goon_matches))
+        print("✅ Enriched Goondesliga:", len(goon_matches))
     
         print("✨ Enriching Spoondesliga matches...")
         for match in spoon_fixtures:
