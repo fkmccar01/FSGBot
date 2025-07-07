@@ -468,9 +468,9 @@ def scrape_league_standings_with_login(session, league_url):
             team_link = cols[2].find("a")
             team_name = team_link.text.strip() if team_link else cols[2].text.strip()
             
-            wins = int(cols[5].text.strip())
-            draws = int(cols[6].text.strip())
-            losses = int(cols[7].text.strip())
+            wins = int(cols[6].text.strip())
+            draws = int(cols[7].text.strip())
+            losses = int(cols[8].text.strip())
             
             gf_ga = cols[9].text.strip()  # e.g. "9 - 5"
             gf, ga = [int(x.strip()) for x in gf_ga.split("-")]
@@ -635,7 +635,7 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
     prompt = (
         f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
         f"Talk in a slight African American accent.\n"
-        f"Keep your previews under a max of 1,000 characters.\n"
+        f"Keep your previews around 1,000 characters.\n"
         f"Give the current league standings context for both teams, including place, wins, draws, losses, goals for, goals against, goal difference, and points.\n"
         f"Include recent form based on the last match result and key player performances.\n"
         f"Make predictions and build excitement for the upcoming game.\n"
