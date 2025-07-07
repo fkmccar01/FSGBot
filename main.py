@@ -452,7 +452,7 @@ def scrape_league_standings_with_login(session, league_url):
 
     rows = standings_table.find_all("tr")[1:]  # Skip header row
     standings = []
-        for row in rows:
+    for row in rows:
         cols = row.find_all("td")
         if len(cols) < 10:
             continue
