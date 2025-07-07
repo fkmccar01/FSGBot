@@ -465,14 +465,33 @@ def scrape_league_standings_with_login(session, league_url):
             diff_text = cols[10].text.strip().replace("+", "")
             diff = int(diff_text)
             
+            played = int(cols[3].text.strip())
+            wins = int(cols[4].text.strip())
+            draws = int(cols[5].text.strip())
+            losses = int(cols[6].text.strip())
+
+            gf = int(cols[7].text.strip())
+            ga = int(cols[9].text.strip())  # Skip the dash in col[8]
+            diff = int(cols[10].text.strip().replace("+", ""))
             points = int(cols[11].text.strip())
-    
+
             standings.append({
                 "place": place,
                 "team": team_name,
+                "played": played,
+                "wins": wins,
+                "draws": draws,
+                "losses": losses,
+                "gf": gf,
+                "ga": ga,
+                "diff": diff,
                 "points": points,
-                "gd": diff
             })
+        except Exception as e:
+            sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
+            continue
+
+    return standings
         except Exception as e:
             sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
             continue
