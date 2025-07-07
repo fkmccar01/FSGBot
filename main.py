@@ -1064,5 +1064,7 @@ def groupme_webhook():
         send_groupme_message(odds_output[:1500])  # Gemini limit safety
         return "ok", 200
 
+    return "ok", 200
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
