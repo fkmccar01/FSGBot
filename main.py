@@ -685,12 +685,6 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
     home_last_match = get_last_match_for_team(upcoming_match["home_team"], league_urls)
     away_last_match = get_last_match_for_team(upcoming_match["away_team"], league_urls)
 
-    # Defensive checks
-    if not team1_last_match and not team2_last_match:
-    return "Sorry, couldn't find last match info for either team."
-
-    # allow the preview if at least one team has data
-
     # Get last match details for home team
     summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
 
