@@ -812,7 +812,9 @@ def groupme_webhook():
 
             soup = BeautifulSoup(match_html, "html.parser")
             match_data = parse_match_data(soup)
-            player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
+            all_grades = parse_player_grades(soup, last_match_data["home_team"], last_match_data["away_team"])
+            home_last_players = [p for p in all_grades if normalize(p["team"]) == normalize(home_team)]
+            away_last_players = [p for p in all_grades if normalize(p["team"]) == normalize(away_team)]
 
             score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
             match_scores.append(score_line)
