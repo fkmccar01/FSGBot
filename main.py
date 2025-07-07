@@ -647,19 +647,6 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
     for p in team2_players:
         prompt += f"- {p['full_name']} ({p['position']}, {p['rating']} 📊)\n"
 
-    prompt += "\n"
-
-    prompt += (
-        f"Team 2: {team2_standings['team']}\n"
-        f"Place: {team2_standings['place']}, W-D-L: {team2_standings['wins']}-{team2_standings['draws']}-{team2_standings['losses']}, "
-        f"GF-GA-Diff: {team2_standings['gf']}-{team2_standings['ga']}-{team2_standings['diff']}, Points: {team2_standings['points']}\n"
-        f"Last match result: {team2_last_match['match_data']['home_team']} {team2_last_match['match_data']['home_score']}-{team2_last_match['match_data']['away_score']} {team2_last_match['match_data']['away_team']}\n"
-        f"Key players and ratings:\n"
-    )
-    for p in team2_last_match["player_grades"]:
-        if p["grade"] is not None:
-            prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
-
     prompt += "\nGenerate a lively and insightful match preview considering the above.\n"
     return prompt
 
