@@ -731,29 +731,48 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
     preview_text = call_gemini_api(prompt)
     return preview_text
 
-@app.route("/tv", methods=["POST"])
-def manual_tv_schedule():
-    session = get_logged_in_session()
-    if not session:
-        send_groupme_message("⚠️ Couldn't log in to X11")
-        return "ok", 200
+def enrich_match_with_data(match, all_standings, league_urls):
+    home_team = match["home_team"]
+    away_team = match["away_team"]
 
-    goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-    spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-    goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
-    spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+    home_standing = find_team_standing(home_team, all_standings)
+    away_standing = find_team_standing(away_team, all_standings)
 
-    tv_schedule = generate_tv_schedule_from_upcoming(
-        goon_fixtures, spoon_fixtures,
-        goon_standings, spoon_standings
-    )
+    # Allow last match to be None (coming off bye)
+    home_last_match_info = get_last_match_for_team(home_team, league_urls)
+    away_last_match_info = get_last_match_for_team(away_team, league_urls)
 
-    send_groupme_message(tv_schedule)
-    return "ok", 200
+    # Get player grades only if match info exists
+    if home_last_match_info:
+        summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match_info["game_id"])
+        home_grades = filter_players_for_team(player_grades_home_all, home_standing["team"])
+        home_last_match = {
+            "match_data": match_data_home,
+            "player_grades": home_grades
+        }
+    else:
+        home_last_match = None
+
+    if away_last_match_info:
+        summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match_info["game_id"])
+        away_grades = filter_players_for_team(player_grades_away_all, away_standing["team"])
+        away_last_match = {
+            "match_data": match_data_away,
+            "player_grades": away_grades
+        }
+    else:
+        away_last_match = None
+
+    return {
+        "home_standing": home_standing,
+        "away_standing": away_standing,
+        "home_last_match": home_last_match,
+        "away_last_match": away_last_match
+    }
 
 def format_draftkzar_odds_prompt(goon_matches, spoon_matches):
     prompt = (
-        "You are DraftKzar, a sharp oddsmaker for FoxSportsGoon.\n\n"
+        "You are DraftKzars, a sharp oddsmaker for FoxSportsGoon.\n\n"
         "Your job is to set **realistic moneyline betting odds** for upcoming Xpert Eleven matchups, based on:\n"
         "- League standings (place, W-D-L, GF-GA-GD, points)\n"
         "- Last match result\n"
@@ -761,7 +780,7 @@ def format_draftkzar_odds_prompt(goon_matches, spoon_matches):
         "Give odds in the format:\n"
         "Team A (-200) vs Team B (+180)\n\n"
         "Only use moneyline odds. Base odds on form, momentum, defense/offense trends, and talent.\n\n"
-        "DraftKzar's Betting Odds\n\n"
+        "DraftKzars Betting Odds\n\n"
         "Goondesliga\n"
     )
 
@@ -786,12 +805,34 @@ def format_match_odds_entry(match):
             grades = last_match["player_grades"]
             grade_str = ", ".join([f"{p['name']} ({p['position']}, {p['grade']}📊)" for p in grades])
             summary += f" Last result: {result}. Key players: {grade_str}."
+        else:
+            summary += " Team is coming off a bye. No recent match data available."
         return summary
 
     home = format_team_block(match["home_standing"], match["home_last_match"])
     away = format_team_block(match["away_standing"], match["away_last_match"])
 
     return f"{match['home_standing']['team']} vs {match['away_standing']['team']}\n{home}\n{away}\n\n"
+
+@app.route("/tv", methods=["POST"])
+def manual_tv_schedule():
+    session = get_logged_in_session()
+    if not session:
+        send_groupme_message("⚠️ Couldn't log in to X11")
+        return "ok", 200
+
+    goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+    spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+    goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
+    spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+
+    tv_schedule = generate_tv_schedule_from_upcoming(
+        goon_fixtures, spoon_fixtures,
+        goon_standings, spoon_standings
+    )
+
+    send_groupme_message(tv_schedule)
+    return "ok", 200
 
 @app.route("/", methods=["GET"])
 def index():
@@ -961,7 +1002,7 @@ def groupme_webhook():
 
     # 🟣 5. Handle Odds Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
-        send_groupme_message("Pullin' up the DraftKzar book... calculating odds and biases...")
+        send_groupme_message("Oh now we're talkin' y'all. Let's take a look at the DraftKzars book...")
     
         session = get_logged_in_session()
         if not session:
