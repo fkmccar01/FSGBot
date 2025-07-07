@@ -51,11 +51,23 @@ def build_team_name_mapping(profiles):
 
 team_mapping = build_team_name_mapping(profiles)
 
-def resolve_team_name(text, team_mapping):
-    text_norm = normalize(text)
-    for alias, official_name in team_mapping.items():
-        if alias == text_norm:
-            return official_name
+def resolve_team_name(text, profiles):
+    """
+    Try to resolve a team name or alias from the message text using profiles.json structure.
+    """
+    norm_text = normalize(text)
+    for profile in profiles.values():
+        # Match against main team name
+        if 'team' in profile and normalize(profile['team']) in norm_text:
+            return profile['team']
+        # Match against team_alias list
+        for alias in profile.get("team_alias", []):
+            if normalize(alias) in norm_text:
+                return profile['team']
+        # Match against manager aliases (just in case)
+        for alias in profile.get("aliases", []):
+            if normalize(alias) in norm_text:
+                return profile['team']
     return None
 
 def send_groupme_message(text):
@@ -621,7 +633,7 @@ def find_team_standing(team_name, standings):
     if not team_name:
         return None
     normalized_team = normalize(team_name)
-    official_name = resolve_team_name(normalized_team, team_mapping)
+    official_name = resolve_team_name(text, profiles)
     if not official_name:
         official_name = team_name  # fallback
     normalized_official = normalize(official_name)
@@ -840,7 +852,7 @@ def groupme_webhook():
 
     # 🟠 2. Handle Specific Team Match Recap
     if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["highlight", "recap"]):
-        resolved_team = resolve_team_name(text, team_mapping)
+        resolved_team = resolve_team_name(text, profiles)
         if not resolved_team:
             return "ok", 200  # No team match, ignore
 
@@ -882,7 +894,7 @@ def groupme_webhook():
 
     # 🟣 4. Handle Match Preview Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "preview" in text_lower:
-        resolved_team = resolve_team_name(text, team_mapping)
+        resolved_team = resolve_team_name(text, profiles)
         send_groupme_message("Preview? We talkin' 'bout previews? Jk y'all, let's get it...")
         if not resolved_team:
             send_groupme_message("Sorry, I couldn't find that team in my records.")
