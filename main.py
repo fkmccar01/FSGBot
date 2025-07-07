@@ -479,7 +479,7 @@ def scrape_league_standings_with_login(session, league_url):
                 "team": team_name,
                 "gf": gf,
                 "ga": ga,
-                "gd": diff,
+                "diff": diff,
                 "points": points
             })
         except Exception as e:
