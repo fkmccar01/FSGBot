@@ -1002,7 +1002,9 @@ def groupme_webhook():
 
     # 🟣 5. Handle Odds Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
+        print("📊 Odds block triggered")
         send_groupme_message("Oh now we're talkin' y'all. Let's take a look at the DraftKzars book...")
+        print("✅ Sent intro odds message")
     
         session = get_logged_in_session()
         if not session:
@@ -1013,31 +1015,48 @@ def groupme_webhook():
         goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
         spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
         all_standings = goon_standings + spoon_standings
+
+        print("📈 Goon standings:", len(goon_standings))
+        print("📈 Spoon standings:", len(spoon_standings))
     
         # Get upcoming fixtures
         goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
         spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
     
+        print("📆 Goon fixtures:", len(goon_fixtures))
+        print("📆 Spoon fixtures:", len(spoon_fixtures))
+
         # Build match entries
         league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
         goon_matches = []
         spoon_matches = []
     
+        print("✨ Enriching Goondesliga matches...")
         for match in goon_fixtures:
             enriched = enrich_match_with_data(match, all_standings, league_urls)
             if enriched:
                 goon_matches.append(enriched)
+         print("✅ Enriched Goondesliga:", len(goon_matches))
     
+        print("✨ Enriching Spoondesliga matches...")
         for match in spoon_fixtures:
             enriched = enrich_match_with_data(match, all_standings, league_urls)
             if enriched:
                 spoon_matches.append(enriched)
+        print("✅ Enriched Spoondesliga:", len(spoon_matches))
+
+        if not goon_matches and not spoon_matches:
+        print("❌ No enriched matches to process")
+        send_groupme_message("No upcoming fixtures found to generate odds.")
+        return "ok", 200
     
         # Build Gemini prompt
         prompt = format_draftkzar_odds_prompt(goon_matches, spoon_matches)
+        print("📤 Gemini Prompt Preview:\n", prompt[:800])
     
         # Get Gemini response
         odds_output = call_gemini_api(prompt)
+        print("📬 Gemini odds output:\n", odds_output)
         send_groupme_message(odds_output[:1500])  # Gemini limit safety
         return "ok", 200
 
