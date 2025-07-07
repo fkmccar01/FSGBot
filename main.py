@@ -1,5 +1,6 @@
 
 
+
 import re
 import unicodedata
 import os
@@ -615,18 +616,17 @@ def get_last_match_for_team(team_name, league_urls):
     return None
 
 def find_team_standing(team_name, standings):
-    normalized = normalize(team_name)
-
-    for s in standings:
-        if normalize(s.get("team_name", "")) == normalized:
-            return s
-
-    for s in standings:
-        candidate = normalize(s.get("team_name", ""))
-        if normalized in candidate or candidate in normalized:
-            return s
-
-    sys.stderr.write(f"❌ Could not find standing for team: {team_name}\n")
+    normalized_team = normalize(team_name)
+    # First try to resolve the normalized name to the official team name using your alias mapping
+    official_name = resolve_team_name(normalized_team, team_mapping)
+    if not official_name:
+        official_name = team_name  # fallback to original if no alias mapping
+    
+    normalized_official = normalize(official_name)
+    
+    for entry in standings:
+        if normalize(entry["team"]) == normalized_official:
+            return entry
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
@@ -731,201 +731,6 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
     # Call Gemini
     preview_text = call_gemini_api(prompt)
     return preview_text
-
-def get_last_match_result_for_team(match_data, team_name):
-    """
-    Extract a simple 'W', 'D', or 'L' for the given team from last match data.
-    Assumes match_data contains keys like 'home_team', 'away_team', 'home_score', 'away_score'.
-    """
-    if not match_data:
-        return None
-
-    home = match_data.get("home_team", "")
-    away = match_data.get("away_team", "")
-    home_score = match_data.get("home_score")
-    away_score = match_data.get("away_score")
-
-    if home_score is None or away_score is None:
-        return None
-
-    team_name_norm = normalize(team_name)
-    home_norm = normalize(home)
-    away_norm = normalize(away)
-
-    if team_name_norm == home_norm:
-        if home_score > away_score:
-            return "W"
-        elif home_score == away_score:
-            return "D"
-        else:
-            return "L"
-    elif team_name_norm == away_norm:
-        if away_score > home_score:
-            return "W"
-        elif away_score == home_score:
-            return "D"
-        else:
-            return "L"
-    else:
-        return None  # team not found in match
-
-def enrich_match_with_data(match, all_standings, league_urls):
-    home_team = match["home_team"]
-    away_team = match["away_team"]
-
-    def find_team_standing(team_name, standings):
-        normalized = normalize(team_name)
-        for s in standings:
-            s_name = s.get("team_name", "")
-            norm_s_name = normalize(s_name)
-            if norm_s_name == normalized:
-                return s
-        # Debug print if not found
-        print(f"❌ Standing NOT found for '{team_name}' (normalized '{normalized}'). Available teams:")
-        for s in standings:
-            print(f"  - '{s.get('team_name', '')}' normalized '{normalize(s.get('team_name', ''))}'")
-        return None
-
-    home_standing = find_team_standing(home_team, all_standings)
-    away_standing = find_team_standing(away_team, all_standings)
-
-    if not home_standing and not away_standing:
-        print(f"⚠️ Missing standings for: {home_team} or {away_team}")
-        return None  # Skip if no standings found for both teams
-
-    # Get last matches info for each team (can be None)
-    home_last_match_info = get_last_match_for_team(home_team, league_urls)
-    away_last_match_info = get_last_match_for_team(away_team, league_urls)
-
-    # Extract player grades for last matches if available
-    if home_last_match_info:
-        _, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match_info["game_id"])
-        home_grades = filter_players_for_team(player_grades_home_all, home_team)
-        home_last_match = {
-            "match_data": match_data_home,
-            "player_grades": home_grades
-        }
-    else:
-        home_last_match = None
-
-    if away_last_match_info:
-        _, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match_info["game_id"])
-        away_grades = filter_players_for_team(player_grades_away_all, away_team)
-        away_last_match = {
-            "match_data": match_data_away,
-            "player_grades": away_grades
-        }
-    else:
-        away_last_match = None
-
-    return {
-        "home_standing": home_standing,
-        "away_standing": away_standing,
-        "home_last_match": home_last_match,
-        "away_last_match": away_last_match
-    }
-
-def prepare_league_matches_for_odds(session, league_url, league_name, all_standings):
-    fixtures = scrape_upcoming_fixtures_from_standings_page(session, league_url)
-    matches_with_data = []
-
-    for match in fixtures:
-        print(f"📌 {league_name} Fixture: {match['home_team']} vs {match['away_team']}")
-        enriched = enrich_match_with_data(match, all_standings, [league_url])
-        if enriched:
-            matches_with_data.append(enriched)
-        else:
-            sys.stderr.write(f"⚠️ Skipping match due to missing data: {match['home_team']} vs {match['away_team']}\n")
-
-    return league_name, matches_with_data
-
-def generate_all_league_odds(session, league_urls_and_names, all_standings):
-    leagues_data = {}
-    for league_url, league_name in league_urls_and_names:
-        league_name, matches = prepare_league_matches_for_odds(session, league_url, league_name, all_standings)
-        leagues_data[league_name] = matches
-
-    odds_message = generate_drafkzar_odds(leagues_data)
-    return odds_message
-
-def get_betting_odds():
-    session = get_logged_in_session()
-    if not session:
-        return "⚠️ Failed to log in to Xpert Eleven."
-
-    goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-    spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-    all_standings = goon_standings + spoon_standings
-
-    leagues = [
-        (GOONDESLIGA_URL, "Goondesliga"),
-        (SPOONDESLIGA_URL, "Spoondesliga")
-    ]
-
-    odds_text = generate_all_league_odds(session, leagues, all_standings)
-    return odds_text
-
-def calculate_team_strength(standing, last_match, team_name):
-    strength = 0
-
-    if standing:
-        strength += standing.get("points", 0) * 2
-        strength += standing.get("diff", 0)
-
-    if last_match:
-        match_data = last_match.get("match_data")
-        result_code = get_last_match_result_for_team(match_data, team_name)
-
-        if result_code == "W":
-            strength += 5
-        elif result_code == "D":
-            strength += 2
-        elif result_code == "L":
-            strength -= 2
-
-        grades = last_match.get("player_grades", {})
-        if grades:
-            avg_grade = sum(grades.values()) / len(grades)
-            strength += avg_grade
-
-    return strength
-
-def generate_drafkzar_odds(leagues):
-    def compute_odds(home_strength, away_strength):
-        total = home_strength + away_strength
-        if total == 0:
-            return (-110, +110)
-        home_prob = home_strength / total
-        away_prob = away_strength / total
-
-        def implied(prob):
-            if prob == 0:
-                return +500
-            moneyline = int(round(-100 * prob / (1 - prob)))
-            if moneyline < 0:
-                return moneyline
-            else:
-                return int(round(100 / prob - 100))
-
-        return (implied(home_prob), implied(away_prob))
-
-    message_lines = ["DrafKzar's Betting Odds\n"]
-
-    for league_name, match_list in leagues.items():
-        message_lines.append(league_name)
-        for match in match_list:
-            home_team = match["home_standing"]["team_name"]
-            away_team = match["away_standing"]["team_name"]
-            home_strength = calculate_team_strength(match["home_standing"], match.get("home_last_match"), home_team)
-            away_strength = calculate_team_strength(match["away_standing"], match.get("away_last_match"), away_team)
-            home_odds, away_odds = compute_odds(home_strength, away_strength)
-
-            home_odds_str = f"{home_team} ({home_odds:+})"
-            away_odds_str = f"{away_team} ({away_odds:+})"
-            message_lines.append(f"{home_odds_str} vs {away_odds_str}")
-        message_lines.append("")  # blank line between leagues
-
-    return "\n".join(message_lines).strip()
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
@@ -1109,29 +914,6 @@ def groupme_webhook():
         # Generate preview
         preview_text = generate_match_preview(session, upcoming_match, goon_standings, spoon_standings)
         send_groupme_message(preview_text[:1500])  # limit message size to 1500 chars
-        return "ok", 200
-
-    # 🟣 5. Handle Odds Requests
-    if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
-        session = get_logged_in_session()
-        if not session:
-            send_groupme_message("⚠️ I couldn't log in to fetch data for odds.")
-            return "ok", 200
-    
-        # Scrape standings once for both leagues
-        goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-        spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-        all_standings = goon_standings + spoon_standings
-    
-        leagues = [
-            (GOONDESLIGA_URL, "Goondesliga"),
-            (SPOONDESLIGA_URL, "Spoondesliga"),
-        ]
-    
-        # Generate odds message for all leagues using the helper
-        odds_msg = generate_all_league_odds(session, leagues, all_standings)
-    
-        send_groupme_message(odds_msg[:1500])  # Limit message length for GroupMe
         return "ok", 200
 
     return "ok", 200
