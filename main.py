@@ -1002,8 +1002,6 @@ def groupme_webhook():
         send_groupme_message(preview_text[:1500])  # limit message size to 1500 chars
         return "ok", 200
 
-    return "ok", 200
-
     # 🟣 5. Handle Odds Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
         print("📊 Odds block triggered")
