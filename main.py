@@ -738,6 +738,10 @@ def enrich_match_with_data(match, all_standings, league_urls):
     home_standing = find_team_standing(home_team, all_standings)
     away_standing = find_team_standing(away_team, all_standings)
 
+    if not home_standing and not away_standing:
+        print(f"⚠️ Missing standings for: {home_team} or {away_team}")
+        return None  # Skip this match if standings not found
+
     # Allow last match to be None (coming off bye)
     home_last_match_info = get_last_match_for_team(home_team, league_urls)
     away_last_match_info = get_last_match_for_team(away_team, league_urls)
