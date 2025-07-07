@@ -667,58 +667,55 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
 def filter_players_for_team(player_grades, team_name):
     return [p for p in player_grades if p['team'] == team_name]
 
-def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings):
-    home_team = upcoming_match['home_team']
-    away_team = upcoming_match['away_team']
+def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings, league_urls):
+    """
+    Generates a match preview text for an upcoming match.
+    Handles cases where one or both teams may be on a bye week (no last match).
+    """
 
-    # Get last matches (could be None if bye week)
-    home_last_match = get_last_match_for_team(home_team)
-    away_last_match = get_last_match_for_team(away_team)
+    home_team = upcoming_match["home_team"]
+    away_team = upcoming_match["away_team"]
 
-    # Defensive: if no last match, set empty or None data to avoid crash
-    if home_last_match is None:
-        summary_home = None
-        player_grades_home_all = []
-        match_data_home = None
-    else:
-        summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+    # Get last matches safely (could be None if bye week)
+    home_last_match = get_last_match_for_team(home_team, league_urls)
+    away_last_match = get_last_match_for_team(away_team, league_urls)
 
-    if away_last_match is None:
-        summary_away = None
-        player_grades_away_all = []
-        match_data_away = None
-    else:
-        summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
+    # Defensive: if both teams have no last match info
+    if not home_last_match and not away_last_match:
+        # Just do a preview based on standings only
+        home_standing = find_team_standing(goon_standings, home_team) or find_team_standing(spoon_standings, home_team)
+        away_standing = find_team_standing(goon_standings, away_team) or find_team_standing(spoon_standings, away_team)
 
-    # Lookup standings for each team
-    team1_standings = lookup_standings(home_team, goon_standings, spoon_standings)
-    team2_standings = lookup_standings(away_team, goon_standings, spoon_standings)
+        prompt = format_gemini_match_preview_prompt(
+            home_standing,
+            away_standing,
+            last_match=None,
+            # Pass None for last match info to signal no recent match
+            last_match=None,
+        )
+        return call_gemini_api(prompt)
 
-    # Prepare data for prompt - pass empty dicts or empty lists if missing
-    team1_last_match_data = {
-        "player_grades": player_grades_home_all,
-        "match_data": match_data_home or {}
-    }
-    team2_last_match_data = {
-        "player_grades": player_grades_away_all,
-        "match_data": match_data_away or {}
-    }
+    # If at least one last match found, gather data for each team or None
+    home_match_data = get_match_summary_and_grades(home_last_match["game_id"]) if home_last_match else (None, None, None)
+    away_match_data = get_match_summary_and_grades(away_last_match["game_id"]) if away_last_match else (None, None, None)
 
-    # Build prompt with all available data
+    home_standing = find_team_standing(goon_standings, home_team) or find_team_standing(spoon_standings, home_team)
+    away_standing = find_team_standing(goon_standings, away_team) or find_team_standing(spoon_standings, away_team)
+
     prompt = format_gemini_match_preview_prompt(
-        team1_standings=team1_standings,
-        team2_standings=team2_standings,
-        team1_last_match=team1_last_match_data,
-        team2_last_match=team2_last_match_data
+        home_standing,
+        away_standing,
+        {
+            "match_data": home_last_match,
+            "player_grades": home_match_data[1] or [],
+        } if home_last_match else None,
+        {
+            "match_data": away_last_match,
+            "player_grades": away_match_data[1] or [],
+        } if away_last_match else None,
     )
 
-    # Now call Gemini API with prompt (your existing code)...
-
-    # Example placeholder for API call and response:
-    # response_text = call_gemini_api(prompt)
-
-    # return response_text or whatever you want to do with it
-    return prompt  # or response_text if you add the API call here
+    return call_gemini_api(prompt)
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
