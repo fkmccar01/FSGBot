@@ -774,62 +774,62 @@ def enrich_match_with_data(match, all_standings, league_urls):
         "away_last_match": away_last_match
     }
 
-def format_draftkzar_odds_prompt(goon_matches, spoon_matches):
-    prompt = (
-        "You are DraftKzars, a sharp oddsmaker for FoxSportsGoon.\n\n"
-        "Your job is to set **realistic moneyline betting odds** for upcoming Xpert Eleven matchups, based on:\n"
-        "- League standings (place, W-D-L, GF-GA-GD, points)\n"
-        "- Last match result\n"
-        "- Key player performance and form (player ratings)\n\n"
-        "Give odds in the format:\n"
-        "Team A (-200) vs Team B (+180)\n\n"
-        "Only use moneyline odds. Base odds on form, momentum, defense/offense trends, and talent.\n\n"
-        "DraftKzars Betting Odds\n\n"
-        "Goondesliga\n"
-    )
-
-    for match in goon_matches:
-        prompt += format_match_odds_entry(match)
-
-    prompt += "\nSpoondesliga\n"
-    for match in spoon_matches:
-        prompt += format_match_odds_entry(match)
-
-    return prompt
-
-def format_match_odds_entry(match):
-    def format_team_block(standing, last_match):
-        # Basic standings info
-        team_name = standing.get("team_name", "Unknown Team")
-        position = standing.get("position", "?")
-        points = standing.get("points", "?")
-        goal_diff = standing.get("diff", "?")
-
-        block = f"{team_name} (Position: {position}, Points: {points}, GD: {goal_diff})\n"
-
+def generate_drafkzar_odds(leagues):
+    def calculate_team_strength(standing, last_match):
+        strength = 0
+        if standing:
+            strength += standing.get("points", 0) * 2
+            strength += standing.get("diff", 0)
         if last_match:
-            result = last_match["match_data"].get("result", "No result")
-            player_grades = last_match.get("player_grades", {})
+            result = last_match["match_data"].get("result", "")
+            if "win" in result.lower():
+                strength += 5
+            elif "draw" in result.lower():
+                strength += 2
+            elif "loss" in result.lower():
+                strength -= 2
+            grades = last_match.get("player_grades", {})
+            if grades:
+                avg = sum(grades.values()) / len(grades)
+                strength += avg  # scale factor can be adjusted
+        return strength
 
-            if player_grades:
-                ratings = list(player_grades.values())
-                avg_rating = sum(ratings) / len(ratings)
-                block += f"Last match result: {result}\n"
-                block += f"Average player rating: {avg_rating:.1f}\n"
+    def compute_odds(home_strength, away_strength):
+        total = home_strength + away_strength
+        if total == 0:
+            return (-110, +110)
+        home_prob = home_strength / total
+        away_prob = away_strength / total
+
+        # Implied odds (with slight juice)
+        def implied(prob):
+            if prob == 0:
+                return +500
+            moneyline = int(round(-100 * prob / (1 - prob)))
+            if moneyline < 0:
+                return moneyline
             else:
-                block += f"Last match result: {result}\n"
-                block += "No player ratings available\n"
-        else:
-            block += "No recent match data available\n"
+                return int(round(100 / prob - 100))
 
-        return block
+        return (implied(home_prob), implied(away_prob))
 
-    home_block = format_team_block(match["home_standing"], match.get("home_last_match"))
-    away_block = format_team_block(match["away_standing"], match.get("away_last_match"))
+    message_lines = ["DrafKzar's Betting Odds\n"]
 
-    match_header = f"Match: {match['home_standing']['team_name']} vs {match['away_standing']['team_name']}\n"
+    for league_name, match_list in leagues.items():
+        message_lines.append(league_name)
+        for match in match_list:
+            home_team = match["home_standing"]["team_name"]
+            away_team = match["away_standing"]["team_name"]
+            home_strength = calculate_team_strength(match["home_standing"], match.get("home_last_match"))
+            away_strength = calculate_team_strength(match["away_standing"], match.get("away_last_match"))
+            home_odds, away_odds = compute_odds(home_strength, away_strength)
 
-    return match_header + home_block + away_block + "\n"
+            home_odds_str = f"{home_team} ({home_odds:+})"
+            away_odds_str = f"{away_team} ({away_odds:+})"
+            message_lines.append(f"{home_odds_str} vs {away_odds_str}")
+        message_lines.append("")  # blank line between leagues
+
+    return "\n".join(message_lines).strip()
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
@@ -1016,64 +1016,81 @@ def groupme_webhook():
         return "ok", 200
 
     # 🟣 5. Handle Odds Requests
-    if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
-        print("📊 Odds block triggered")
-        send_groupme_message("Oh now we're talkin' y'all. Let's take a look at the DraftKzars book...")
-        print("✅ Sent intro odds message")
-    
+       if any(bot_name in text_lower for bot_name in bot_aliases) and "odds" in text_lower:
+        sys.stderr.write("✅ Triggered odds command.\n")
+        send_groupme_message("Crunching those odds for y'all...")
+
         session = get_logged_in_session()
         if not session:
-            send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch league data.")
+            send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
             return "ok", 200
-    
-        # Get standings
+
+        # Get latest matches from both leagues to build last match lookup
+        goon_recent = get_latest_game_ids_from_league(GOONDESLIGA_URL)
+        spoon_recent = get_latest_game_ids_from_league(SPOONDESLIGA_URL)
+
+        last_matches = {}
+
+        def fetch_and_store_last_matches(recent_matches):
+            for match in recent_matches:
+                match_html = scrape_match_html(session, f"https://www.xperteleven.com/gameDetails.aspx?GameID={match['game_id']}&dh=2")
+                if not match_html:
+                    sys.stderr.write(f"⚠️ Failed to fetch match {match['game_id']}\n")
+                    continue
+                soup = BeautifulSoup(match_html, "html.parser")
+                match_data = parse_match_data(soup)
+                player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
+
+                home_team_key = normalize(match_data["home_team"])
+                away_team_key = normalize(match_data["away_team"])
+
+                # Store match_data and filtered player grades by team
+                last_matches[home_team_key] = {
+                    "match_data": match_data,
+                    "player_grades": {p["name"]: p["grade"] for p in player_grades if p["team"] == match_data["home_team"]}
+                }
+                last_matches[away_team_key] = {
+                    "match_data": match_data,
+                    "player_grades": {p["name"]: p["grade"] for p in player_grades if p["team"] == match_data["away_team"]}
+                }
+
+        fetch_and_store_last_matches(goon_recent)
+        fetch_and_store_last_matches(spoon_recent)
+
+        # Scrape current standings
         goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
         spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-        all_standings = goon_standings + spoon_standings
 
-        print("📈 Goon standings:", len(goon_standings))
-        print("📈 Spoon standings:", len(spoon_standings))
-    
-        # Get upcoming fixtures
+        # Scrape upcoming fixtures
         goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
         spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
-    
-        print("📆 Goon fixtures:", len(goon_fixtures))
-        print("📆 Spoon fixtures:", len(spoon_fixtures))
 
-        # Build match entries
-        league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
-        goon_matches = []
-        spoon_matches = []
-    
-        print("✨ Enriching Goondesliga matches...")
-        for match in goon_fixtures:
-            enriched = enrich_match_with_data(match, all_standings, league_urls)
-            if enriched:
-                goon_matches.append(enriched)
-        print("✅ Enriched Goondesliga:", len(goon_matches))
-    
-        print("✨ Enriching Spoondesliga matches...")
-        for match in spoon_fixtures:
-            enriched = enrich_match_with_data(match, all_standings, league_urls)
-            if enriched:
-                spoon_matches.append(enriched)
-        print("✅ Enriched Spoondesliga:", len(spoon_matches))
+        # Attach standings and last match data to fixtures
+        def attach_data(fixtures, standings, last_matches):
+            standing_lookup = {normalize(s["team_name"]): s for s in standings}
+            for match in fixtures:
+                home_key = normalize(match["home_team"])
+                away_key = normalize(match["away_team"])
+                match["home_standing"] = standing_lookup.get(home_key, {})
+                match["away_standing"] = standing_lookup.get(away_key, {})
+                match["home_last_match"] = last_matches.get(home_key)
+                match["away_last_match"] = last_matches.get(away_key)
+            return fixtures
 
-        if not goon_matches and not spoon_matches:
-            print("❌ No enriched matches to process")
-            send_groupme_message("No upcoming fixtures found to generate odds.")
-            return "ok", 200
-    
-        # Build Gemini prompt
-        prompt = format_draftkzar_odds_prompt(goon_matches, spoon_matches)
-        print("📤 Gemini Prompt Preview:\n", prompt[:800])
-    
-        # Get Gemini response
-        odds_output = call_gemini_api(prompt)
-        print("📬 Gemini odds output:\n", odds_output)
-        send_groupme_message(odds_output[:1500])  # Gemini limit safety
+        goon_fixtures = attach_data(goon_fixtures, goon_standings, last_matches)
+        spoon_fixtures = attach_data(spoon_fixtures, spoon_standings, last_matches)
+
+        # Organize fixtures by league for your existing odds function
+        fixtures_by_league = {
+            "Goondesliga": goon_fixtures,
+            "Spoondesliga": spoon_fixtures,
+        }
+
+        odds_message = generate_drafkzar_odds(fixtures_by_league)
+        send_groupme_message(odds_message[:1500])  # Limit message length if needed
+
         return "ok", 200
+
 
     return "ok", 200
 
