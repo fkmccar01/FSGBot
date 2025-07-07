@@ -512,7 +512,7 @@ def generate_standings_summary(standings, league_name):
             if team["points"] <= sixth_place_points + 4:
                 relegation.append(f"{team['team']} ({team['points']} pts)")
     if relegation:
-        summary += f"\n📉 {bottom_watch_label}: {', '.join(relegation)}"
+        summary += f"\n{bottom_watch_label}: {', '.join(relegation)}"
 
     return summary.strip()
 
