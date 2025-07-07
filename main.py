@@ -650,6 +650,9 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
     prompt += "\nGenerate a lively and insightful match preview considering the above.\n"
     return prompt
 
+def filter_players_for_team(player_grades, team_name):
+    return [p for p in player_grades if p['team'] == team_name]
+
 def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings):
     """
     session: logged-in requests.Session()
@@ -673,19 +676,25 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
         return "Sorry, couldn't find last match info for both teams."
 
     # Get last match details for home team
-    summary_home, player_grades_home, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+    summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
 
     # Get last match details for away team
-    summary_away, player_grades_away, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
+    summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
 
-    # Prepare input for Gemini prompt
+    # Filter player grades for the correct team only
+    team1_name = home_standings['team']
+    team2_name = away_standings['team']
+
+    team1_player_grades = filter_players_for_team(player_grades_home_all, team1_name)
+    team2_player_grades = filter_players_for_team(player_grades_away_all, team2_name)
+
     team1_last_match = {
         "match_data": match_data_home,
-        "player_grades": player_grades_home
+        "player_grades": team1_player_grades
     }
     team2_last_match = {
         "match_data": match_data_away,
-        "player_grades": player_grades_away
+        "player_grades": team2_player_grades
     }
 
     # Format prompt
