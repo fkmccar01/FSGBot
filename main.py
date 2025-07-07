@@ -666,13 +666,13 @@ def groupme_webhook():
         # Use the logged-in session to scrape standings
         standings = scrape_league_standings_with_login(session, league_url)
 
+        league_name = "The Goondesliga 🏆" if "goondesliga" in text_lower else "The Spoondesliga 🥄"
+
         try:
             standings_summary = generate_standings_summary(standings, league_name)
         except Exception as e:
             sys.stderr.write(f"⚠️ Error parsing standings: {e}\n")
             standings_summary = "Standings data is missing."
-
-        league_name = "The Goondesliga 🏆" if "goondesliga" in text_lower else "The Spoondesliga 🥄"
 
         final_message = (
             f"{league_name}\n\n"
