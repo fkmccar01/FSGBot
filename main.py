@@ -702,7 +702,7 @@ def groupme_webhook():
 
     # 🟣 3. Handle TV Schedule Requests
     if any(bot_name in text_lower for bot_name in bot_aliases):
-        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "kzhedule", "schedule", "guide", "games"]):
+        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "on", "kzhedule", "schedule", "guide", "games"]):
             sys.stderr.write("✅ Triggered TV schedule command.\n")
             send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon this week...")
     
