@@ -799,37 +799,37 @@ def format_draftkzar_odds_prompt(goon_matches, spoon_matches):
 
 def format_match_odds_entry(match):
     def format_team_block(standing, last_match):
-    # Basic standings info
-    team_name = standing.get("team_name", "Unknown Team")
-    position = standing.get("position", "?")
-    points = standing.get("points", "?")
-    goal_diff = standing.get("diff", "?")
-    
-    block = f"{team_name} (Position: {position}, Points: {points}, GD: {goal_diff})\n"
-    
-    if last_match:
-        result = last_match["match_data"].get("result", "No result")
-        # Extract player ratings list from last_match, e.g. last_match["player_grades"]
-        player_grades = last_match.get("player_grades", {})
-        
-        # Compute average player rating if you want a simple metric
-        if player_grades:
-            ratings = list(player_grades.values())
-            avg_rating = sum(ratings) / len(ratings)
-            block += f"Last match result: {result}\n"
-            block += f"Average player rating: {avg_rating:.1f}\n"
+        # Basic standings info
+        team_name = standing.get("team_name", "Unknown Team")
+        position = standing.get("position", "?")
+        points = standing.get("points", "?")
+        goal_diff = standing.get("diff", "?")
+
+        block = f"{team_name} (Position: {position}, Points: {points}, GD: {goal_diff})\n"
+
+        if last_match:
+            result = last_match["match_data"].get("result", "No result")
+            player_grades = last_match.get("player_grades", {})
+
+            if player_grades:
+                ratings = list(player_grades.values())
+                avg_rating = sum(ratings) / len(ratings)
+                block += f"Last match result: {result}\n"
+                block += f"Average player rating: {avg_rating:.1f}\n"
+            else:
+                block += f"Last match result: {result}\n"
+                block += "No player ratings available\n"
         else:
-            block += f"Last match result: {result}\n"
-            block += "No player ratings available\n"
-    else:
-        block += "No recent match data available\n"
-    
-    return block
+            block += "No recent match data available\n"
 
-    home = format_team_block(match["home_standing"], match["home_last_match"])
-    away = format_team_block(match["away_standing"], match["away_last_match"])
+        return block
 
-    return f"{match['home_standing']['team']} vs {match['away_standing']['team']}\n{home}\n{away}\n\n"
+    home_block = format_team_block(match["home_standing"], match.get("home_last_match"))
+    away_block = format_team_block(match["away_standing"], match.get("away_last_match"))
+
+    match_header = f"Match: {match['home_standing']['team_name']} vs {match['away_standing']['team_name']}\n"
+
+    return match_header + home_block + away_block + "\n"
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
