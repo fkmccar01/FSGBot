@@ -439,6 +439,12 @@ def get_match_summary_and_grades(game_id):
 import sys  # Make sure this is imported at the top
 
 def scrape_league_standings_with_login(session, league_url):
+    def safe_int(text):
+        text = text.strip()
+        if text.isdigit() or (text.startswith("+") and text[1:].isdigit()):
+            return int(text.replace("+", ""))
+        return None
+
     response = session.get(league_url)
     if response.status_code != 200:
         sys.stderr.write(f"⚠️ Failed to fetch league table with login: {response.status_code}\n")
@@ -450,49 +456,53 @@ def scrape_league_standings_with_login(session, league_url):
         sys.stderr.write("⚠️ Standings table not found in logged-in page.\n")
         return []
 
-    rows = standings_table.find_all("tr")[1:]  # Skip header row
+    rows = standings_table.find_all("tr")[1:]  # Skip header
     standings = []
     for row in rows:
         cols = row.find_all("td")
-        if len(cols) < 12:  # Because we need up to index 11
+        # Debug print
+        sys.stderr.write(f"STANDINGS ROW COLS: {[col.text.strip() for col in cols]}\n")
+
+        if len(cols) < 12:
             continue
-        try:
-            place = int(cols[0].text.strip().strip("."))
-            team_link = cols[2].find("a")
-            team_name = team_link.text.strip() if team_link else cols[2].text.strip()
-    
-            played = int(cols[3].text.strip())
-            wins = int(cols[4].text.strip())
-            draws = int(cols[5].text.strip())
-            losses = int(cols[6].text.strip())
-    
-            gf = int(cols[7].text.strip())
-            # cols[8] is dash "-", so skip or verify it equals "-"
-            if cols[8].text.strip() != "-":
-                sys.stderr.write("⚠️ Unexpected format in GF-GA separator column.\n")
-                continue
-            ga = int(cols[9].text.strip())
-    
-            diff_text = cols[10].text.strip().replace("+", "")
-            diff = int(diff_text)
-    
-            points = int(cols[11].text.strip())
-    
-            standings.append({
-                "place": place,
-                "team": team_name,
-                "played": played,
-                "wins": wins,
-                "draws": draws,
-                "losses": losses,
-                "gf": gf,
-                "ga": ga,
-                "diff": diff,
-                "points": points,
-            })
-        except Exception as e:
-            sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
+
+        place = safe_int(cols[0].text.strip().strip("."))
+        if place is None:
+            continue  # skip invalid rows
+
+        team_link = cols[2].find("a")
+        team_name = team_link.text.strip() if team_link else cols[2].text.strip()
+
+        played = safe_int(cols[3].text)
+        wins = safe_int(cols[4].text)
+        draws = safe_int(cols[5].text)
+        losses = safe_int(cols[6].text)
+        gf = safe_int(cols[7].text)
+        # Check the separator dash
+        if cols[8].text.strip() != "-":
+            sys.stderr.write("⚠️ Unexpected separator in GF-GA column.\n")
             continue
+        ga = safe_int(cols[9].text)
+        diff = safe_int(cols[10].text.replace("+", ""))
+        points = safe_int(cols[11].text)
+
+        # Only append if all essential numeric fields are valid
+        if None in (played, wins, draws, losses, gf, ga, diff, points):
+            sys.stderr.write(f"⚠️ Skipping row with incomplete numeric data: {team_name}\n")
+            continue
+
+        standings.append({
+            "place": place,
+            "team": team_name,
+            "played": played,
+            "wins": wins,
+            "draws": draws,
+            "losses": losses,
+            "gf": gf,
+            "ga": ga,
+            "diff": diff,
+            "points": points
+        })
 
     return standings
 
