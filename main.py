@@ -798,20 +798,33 @@ def format_draftkzar_odds_prompt(goon_matches, spoon_matches):
     return prompt
 
 def format_match_odds_entry(match):
-    def format_team_block(team_standing, last_match):
-        summary = (
-            f"{team_standing['team']} — Place: {team_standing['place']}, "
-            f"W-D-L: {team_standing['wins']}-{team_standing['draws']}-{team_standing['losses']}, "
-            f"GD: {team_standing['diff']}, Points: {team_standing['points']}."
-        )
-        if last_match:
-            result = last_match["match_data"].get("result", "No result available")
-            grades = last_match["player_grades"]
-            grade_str = ", ".join([f"{p['name']} ({p['position']}, {p['grade']}📊)" for p in grades])
-            summary += f" Last result: {result}. Key players: {grade_str}."
+    def format_team_block(standing, last_match):
+    # Basic standings info
+    team_name = standing.get("team_name", "Unknown Team")
+    position = standing.get("position", "?")
+    points = standing.get("points", "?")
+    goal_diff = standing.get("diff", "?")
+    
+    block = f"{team_name} (Position: {position}, Points: {points}, GD: {goal_diff})\n"
+    
+    if last_match:
+        result = last_match["match_data"].get("result", "No result")
+        # Extract player ratings list from last_match, e.g. last_match["player_grades"]
+        player_grades = last_match.get("player_grades", {})
+        
+        # Compute average player rating if you want a simple metric
+        if player_grades:
+            ratings = list(player_grades.values())
+            avg_rating = sum(ratings) / len(ratings)
+            block += f"Last match result: {result}\n"
+            block += f"Average player rating: {avg_rating:.1f}\n"
         else:
-            summary += " Team is coming off a bye. No recent match data available."
-        return summary
+            block += f"Last match result: {result}\n"
+            block += "No player ratings available\n"
+    else:
+        block += "No recent match data available\n"
+    
+    return block
 
     home = format_team_block(match["home_standing"], match["home_last_match"])
     away = format_team_block(match["away_standing"], match["away_last_match"])
