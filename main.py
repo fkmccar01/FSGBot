@@ -623,9 +623,9 @@ def find_team_standing(team_name, standings):
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
-    # Extract player lists separately
-    team1_players = team1_last_match['players']  # filtered to team1 only
-    team2_players = team2_last_match['players']  # filtered to team2 only
+    # Use player_grades instead of players
+    team1_players = team1_last_match['player_grades']
+    team2_players = team2_last_match['player_grades']
 
     prompt = (
         f"Team 1: {team1_standings['team']}\n"
@@ -635,7 +635,7 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Key players and ratings:\n"
     )
     for p in team1_players:
-        prompt += f"- {p['full_name']} ({p['position']}, {p['rating']} 📊)\n"
+        prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
 
     prompt += (
         f"\nTeam 2: {team2_standings['team']}\n"
@@ -645,7 +645,7 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Key players and ratings:\n"
     )
     for p in team2_players:
-        prompt += f"- {p['full_name']} ({p['position']}, {p['rating']} 📊)\n"
+        prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
 
     prompt += "\nGenerate a lively and insightful match preview considering the above.\n"
     return prompt
