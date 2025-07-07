@@ -1,4 +1,5 @@
 
+
 import re
 import unicodedata
 import os
@@ -29,10 +30,6 @@ def normalize(text):
     """Lowercases, removes accents, and strips special characters for reliable comparison."""
     if not text:
         return ""
-    if isinstance(text, list):
-        text = " ".join(text)
-    if not isinstance(text, str):
-        text = str(text)
     text = unicodedata.normalize('NFKD', text)
     text = text.encode('ASCII', 'ignore').decode('utf-8')
     text = re.sub(r'[^a-z0-9 ]+', '', text.lower())
@@ -44,30 +41,18 @@ def build_team_name_mapping(profiles):
         team = profile.get("team")
         aliases = profile.get("team_alias", [])
         if team:
-            mapping[normalize(team)] = team
+            mapping[normalize(team.lower())] = team
             for alias in aliases:
-                mapping[normalize(alias)] = team
+                mapping[normalize(alias.lower())] = team
     return mapping
 
 team_mapping = build_team_name_mapping(profiles)
 
-def resolve_team_name(text, profiles):
-    """
-    Try to resolve a team name or alias from the message text using profiles.json structure.
-    """
-    norm_text = normalize(text)
-    for profile in profiles.values():
-        # Match against main team name
-        if 'team' in profile and normalize(profile['team']) in norm_text:
-            return profile['team']
-        # Match against team_alias list
-        for alias in profile.get("team_alias", []):
-            if normalize(alias) in norm_text:
-                return profile['team']
-        # Match against manager aliases (just in case)
-        for alias in profile.get("aliases", []):
-            if normalize(alias) in norm_text:
-                return profile['team']
+def resolve_team_name(text, team_mapping):
+    text = text.strip().lower()
+    for alias, official_name in team_mapping.items():
+        if alias in normalize(text):
+            return official_name
     return None
 
 def send_groupme_message(text):
@@ -630,15 +615,23 @@ def get_last_match_for_team(team_name, league_urls):
     return None
 
 def find_team_standing(team_name, standings):
-    for team in standings:
-        if normalize(team["team"]) == normalize(team_name):
-            return team
+    normalized_team = normalize(team_name)
+    # First try to resolve the normalized name to the official team name using your alias mapping
+    official_name = resolve_team_name(normalized_team, team_mapping)
+    if not official_name:
+        official_name = team_name  # fallback to original if no alias mapping
+    
+    normalized_official = normalize(official_name)
+    
+    for entry in standings:
+        if normalize(entry["team"]) == normalized_official:
+            return entry
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
-    # Defensive: If player_grades missing, set empty list to avoid crashes
-    team1_players = team1_last_match.get('player_grades', []) if team1_last_match else []
-    team2_players = team2_last_match.get('player_grades', []) if team2_last_match else []
+    # Use player_grades instead of players
+    team1_players = team1_last_match['player_grades']
+    team2_players = team2_last_match['player_grades']
 
     prompt = (
         f"You are Taycan A. Schitt, a studio TV analyst for FoxSportsGoon. You provide exciting, insightful **match previews** for upcoming soccer games.\n\n"
@@ -650,48 +643,24 @@ def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_l
         f"Make predictions and build excitement for the upcoming game.\n"
         f"Use full player names and include player ratings where relevant.\n"
         f"Keep it engaging as a TV preview.\n\n"
-        f"Team 1: {team1_standings.get('team', 'N/A')}\n"
-        f"Place: {team1_standings.get('place', 'N/A')}, W-D-L: {team1_standings.get('wins', 0)}-{team1_standings.get('draws', 0)}-{team1_standings.get('losses', 0)}, "
-        f"GF-GA-Diff: {team1_standings.get('gf', 0)}-{team1_standings.get('ga', 0)}-{team1_standings.get('diff', 0)}, Points: {team1_standings.get('points', 0)}\n"
+        f"Team 1: {team1_standings['team']}\n"
+        f"Place: {team1_standings['place']}, W-D-L: {team1_standings['wins']}-{team1_standings['draws']}-{team1_standings['losses']}, "
+        f"GF-GA-Diff: {team1_standings['gf']}-{team1_standings['ga']}-{team1_standings['diff']}, Points: {team1_standings['points']}\n"
+        f"Last match result: {team1_last_match['match_data']['home_team']} {team1_last_match['match_data']['home_score']}-{team1_last_match['match_data']['away_score']} {team1_last_match['match_data']['away_team']}\n"
+        f"Key players and ratings:\n"
     )
-
-    if team1_last_match and isinstance(team1_last_match, dict):
-        md = team1_last_match.get('match_data', {})
-        home_team = md.get('home_team', 'N/A')
-        away_team = md.get('away_team', 'N/A')
-        home_score = md.get('home_score', '?')
-        away_score = md.get('away_score', '?')
-        prompt += f"Last match result: {home_team} {home_score}-{away_score} {away_team}\n"
-        prompt += "Key players and ratings:\n"
-        for p in team1_players:
-            grade = p.get('grade')
-            if grade is not None:
-                prompt += f"- {p.get('name', 'Unknown')} ({p.get('position', '?')}, {grade} 📊)\n"
-    else:
-        prompt += "Last match result: Team did not play last round (bye week).\n"
-
-    prompt += "\n"
+    for p in team1_players:
+        prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
 
     prompt += (
-        f"Team 2: {team2_standings.get('team', 'N/A')}\n"
-        f"Place: {team2_standings.get('place', 'N/A')}, W-D-L: {team2_standings.get('wins', 0)}-{team2_standings.get('draws', 0)}-{team2_standings.get('losses', 0)}, "
-        f"GF-GA-Diff: {team2_standings.get('gf', 0)}-{team2_standings.get('ga', 0)}-{team2_standings.get('diff', 0)}, Points: {team2_standings.get('points', 0)}\n"
+        f"\nTeam 2: {team2_standings['team']}\n"
+        f"Place: {team2_standings['place']}, W-D-L: {team2_standings['wins']}-{team2_standings['draws']}-{team2_standings['losses']}, "
+        f"GF-GA-Diff: {team2_standings['gf']}-{team2_standings['ga']}-{team2_standings['diff']}, Points: {team2_standings['points']}\n"
+        f"Last match result: {team2_last_match['match_data']['home_team']} {team2_last_match['match_data']['home_score']}-{team2_last_match['match_data']['away_score']} {team2_last_match['match_data']['away_team']}\n"
+        f"Key players and ratings:\n"
     )
-
-    if team2_last_match and isinstance(team2_last_match, dict):
-        md = team2_last_match.get('match_data', {})
-        home_team = md.get('home_team', 'N/A')
-        away_team = md.get('away_team', 'N/A')
-        home_score = md.get('home_score', '?')
-        away_score = md.get('away_score', '?')
-        prompt += f"Last match result: {home_team} {home_score}-{away_score} {away_team}\n"
-        prompt += "Key players and ratings:\n"
-        for p in team2_players:
-            grade = p.get('grade')
-            if grade is not None:
-                prompt += f"- {p.get('name', 'Unknown')} ({p.get('position', '?')}, {grade} 📊)\n"
-    else:
-        prompt += "Last match result: Team did not play last round (bye week).\n"
+    for p in team2_players:
+        prompt += f"- {p['name']} ({p['position']}, {p['grade']} 📊)\n"
 
     prompt += "\nGenerate a lively and insightful match preview considering the above.\n"
     return prompt
@@ -700,41 +669,50 @@ def filter_players_for_team(player_grades, team_name):
     return [p for p in player_grades if p['team'] == team_name]
 
 def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings, league_urls):
-    home_team = upcoming_match.get("home_team", "")
-    away_team = upcoming_match.get("away_team", "")
+    """
+    Generates a match preview text for an upcoming match.
+    Handles cases where one or both teams may be on a bye week (no last match).
+    """
 
+    home_team = upcoming_match["home_team"]
+    away_team = upcoming_match["away_team"]
+
+    # Get last matches safely (could be None if bye week)
     home_last_match = get_last_match_for_team(home_team, league_urls)
     away_last_match = get_last_match_for_team(away_team, league_urls)
 
-    home_standing = find_team_standing(home_team, goon_standings) or find_team_standing(home_team, spoon_standings)
-    away_standing = find_team_standing(away_team, goon_standings) or find_team_standing(away_team, spoon_standings)
+    # Defensive: if both teams have no last match info
+    if not home_last_match and not away_last_match:
+        # Just do a preview based on standings only
+        home_standing = find_team_standing(goon_standings, home_team) or find_team_standing(spoon_standings, home_team)
+        away_standing = find_team_standing(goon_standings, away_team) or find_team_standing(spoon_standings, away_team)
 
-    # Defensive: if standings missing, create dummy placeholders to avoid None errors
-    if not home_standing:
-        home_standing = {"team": home_team, "place": "N/A", "wins": 0, "draws": 0, "losses": 0, "gf": 0, "ga": 0, "diff": 0, "points": 0}
-    if not away_standing:
-        away_standing = {"team": away_team, "place": "N/A", "wins": 0, "draws": 0, "losses": 0, "gf": 0, "ga": 0, "diff": 0, "points": 0}
+        prompt = format_gemini_match_preview_prompt(
+            home_standing,
+            away_standing,
+            team1_last_match=None,  # for home team
+            team2_last_match=None,  # for away team
+        )
+        return call_gemini_api(prompt)
 
-    # Get match summaries if available
-    if home_last_match:
-        home_summary, home_grades, _ = get_match_summary_and_grades(home_last_match["game_id"])
-        home_last = {"match_data": home_last_match, "player_grades": home_grades}
-    else:
-        home_summary = "Team is coming off a bye this round."
-        home_last = None
+    # If at least one last match found, gather data for each team or None
+    home_match_data = get_match_summary_and_grades(home_last_match["game_id"]) if home_last_match else (None, None, None)
+    away_match_data = get_match_summary_and_grades(away_last_match["game_id"]) if away_last_match else (None, None, None)
 
-    if away_last_match:
-        away_summary, away_grades, _ = get_match_summary_and_grades(away_last_match["game_id"])
-        away_last = {"match_data": away_last_match, "player_grades": away_grades}
-    else:
-        away_summary = "Team is coming off a bye this round."
-        away_last = None
+    home_standing = find_team_standing(goon_standings, home_team) or find_team_standing(spoon_standings, home_team)
+    away_standing = find_team_standing(goon_standings, away_team) or find_team_standing(spoon_standings, away_team)
 
     prompt = format_gemini_match_preview_prompt(
         home_standing,
         away_standing,
-        home_last,
-        away_last,
+        {
+            "match_data": home_last_match,
+            "player_grades": home_match_data[1] or [],
+        } if home_last_match else None,
+        {
+            "match_data": away_last_match,
+            "player_grades": away_match_data[1] or [],
+        } if away_last_match else None,
     )
 
     return call_gemini_api(prompt)
@@ -812,9 +790,7 @@ def groupme_webhook():
 
             soup = BeautifulSoup(match_html, "html.parser")
             match_data = parse_match_data(soup)
-            all_grades = parse_player_grades(soup, last_match_data["home_team"], last_match_data["away_team"])
-            home_last_players = [p for p in all_grades if normalize(p["team"]) == normalize(home_team)]
-            away_last_players = [p for p in all_grades if normalize(p["team"]) == normalize(away_team)]
+            player_grades = parse_player_grades(soup, match_data["home_team"], match_data["away_team"])
 
             score_line = f"{match_data['home_team']} {match_data['home_score']}-{match_data['away_score']} {match_data['away_team']}"
             match_scores.append(score_line)
@@ -847,7 +823,7 @@ def groupme_webhook():
 
     # 🟠 2. Handle Specific Team Match Recap
     if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["highlight", "recap"]):
-        resolved_team = resolve_team_name(text, profiles)
+        resolved_team = resolve_team_name(text, team_mapping)
         if not resolved_team:
             return "ok", 200  # No team match, ignore
 
@@ -889,23 +865,27 @@ def groupme_webhook():
 
     # 🟣 4. Handle Match Preview Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "preview" in text_lower:
-        resolved_team = resolve_team_name(text, profiles)
+        # Extract team name from message (attempt)
+        resolved_team = resolve_team_name(text, team_mapping)
         send_groupme_message("Preview? We talkin' 'bout previews? Jk y'all, let's get it...")
         if not resolved_team:
             send_groupme_message("Sorry, I couldn't find that team in my records.")
             return "ok", 200
-
+    
         session = get_logged_in_session()
         if not session:
             send_groupme_message("⚠️ Failed to log in to Xpert Eleven to fetch match data.")
             return "ok", 200
     
+        # Get standings for both leagues
         goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
         spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
     
+        # Find upcoming fixtures
         goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
         spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
     
+        # Look for upcoming match involving resolved_team
         upcoming_match = None
         for match in goon_fixtures + spoon_fixtures:
             if normalize(match["home_team"]) == normalize(resolved_team) or normalize(match["away_team"]) == normalize(resolved_team):
@@ -915,11 +895,12 @@ def groupme_webhook():
         if not upcoming_match:
             send_groupme_message(f"Sorry, I couldn't find an upcoming match for {resolved_team}.")
             return "ok", 200
+    
+        # Generate preview
+        preview_text = generate_match_preview(session, upcoming_match, goon_standings, spoon_standings)
+        send_groupme_message(preview_text[:1500])  # limit message size to 1500 chars
+        return "ok", 200
 
-    league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]  # <--- add this line
-
-    preview_text = generate_match_preview(session, upcoming_match, goon_standings, spoon_standings, league_urls)  # <--- pass league_urls
-    send_groupme_message(preview_text[:1500])
     return "ok", 200
 
 if __name__ == "__main__":
