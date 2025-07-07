@@ -1050,9 +1050,9 @@ def groupme_webhook():
         print("✅ Enriched Spoondesliga:", len(spoon_matches))
 
         if not goon_matches and not spoon_matches:
-        print("❌ No enriched matches to process")
-        send_groupme_message("No upcoming fixtures found to generate odds.")
-        return "ok", 200
+            print("❌ No enriched matches to process")
+            send_groupme_message("No upcoming fixtures found to generate odds.")
+            return "ok", 200
     
         # Build Gemini prompt
         prompt = format_draftkzar_odds_prompt(goon_matches, spoon_matches)
