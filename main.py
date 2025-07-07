@@ -617,10 +617,16 @@ def get_last_match_for_team(team_name, league_urls):
 def find_team_standing(team_name, standings):
     normalized = normalize(team_name)
     for s in standings:
-        standing_name = s.get("team_name", "")
-        if normalize(standing_name) == normalized:
+        s_name = s.get("team_name", "")
+        norm_s_name = normalize(s_name)
+        if norm_s_name == normalized:
             return s
-    print(f"⚠️ Could not find standing for team: '{team_name}' normalized as '{normalized}'")
+    # Debug log if no match found
+    print(f"❌ No match found for team '{team_name}' → normalized: '{normalized}'")
+    print("🔍 Standings teams available:")
+    for s in standings:
+        s_name = s.get("team_name", "")
+        print(f"  - Raw: '{s_name}' → Normalized: '{normalize(s_name)}'")
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
@@ -824,6 +830,7 @@ def prepare_league_matches_for_odds(session, league_url, league_name, all_standi
     matches_with_data = []
 
     for match in fixtures:
+        print(f"📌 {league_name} Fixture: {match['home_team']} vs {match['away_team']}")
         enriched = enrich_match_with_data(match, all_standings, [league_url])
         if enriched:
             matches_with_data.append(enriched)
