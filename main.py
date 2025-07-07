@@ -668,51 +668,57 @@ def filter_players_for_team(player_grades, team_name):
     return [p for p in player_grades if p['team'] == team_name]
 
 def generate_match_preview(session, upcoming_match, goon_standings, spoon_standings):
-    """
-    session: logged-in requests.Session()
-    upcoming_match: dict with home_team, away_team, game_id
-    goon_standings/spoon_standings: lists of dicts from standings scraping
-    """
+    home_team = upcoming_match['home_team']
+    away_team = upcoming_match['away_team']
 
-    # Find standings for each team in either league
-    all_standings = goon_standings + spoon_standings
-    home_standings = find_team_standing(upcoming_match["home_team"], all_standings)
-    away_standings = find_team_standing(upcoming_match["away_team"], all_standings)
+    # Get last matches (could be None if bye week)
+    home_last_match = get_last_match_for_team(home_team)
+    away_last_match = get_last_match_for_team(away_team)
 
-    league_urls = [GOONDESLIGA_URL, SPOONDESLIGA_URL]
+    # Defensive: if no last match, set empty or None data to avoid crash
+    if home_last_match is None:
+        summary_home = None
+        player_grades_home_all = []
+        match_data_home = None
+    else:
+        summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
 
-    # Get last match for each team
-    home_last_match = get_last_match_for_team(upcoming_match["home_team"], league_urls)
-    away_last_match = get_last_match_for_team(upcoming_match["away_team"], league_urls)
+    if away_last_match is None:
+        summary_away = None
+        player_grades_away_all = []
+        match_data_away = None
+    else:
+        summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
 
-    # Get last match details for home team
-    summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+    # Lookup standings for each team
+    team1_standings = lookup_standings(home_team, goon_standings, spoon_standings)
+    team2_standings = lookup_standings(away_team, goon_standings, spoon_standings)
 
-    # Get last match details for away team
-    summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
-
-    # Filter player grades for the correct team only
-    team1_name = home_standings['team']
-    team2_name = away_standings['team']
-
-    team1_player_grades = filter_players_for_team(player_grades_home_all, team1_name)
-    team2_player_grades = filter_players_for_team(player_grades_away_all, team2_name)
-
-    team1_last_match = {
-        "match_data": match_data_home,
-        "player_grades": team1_player_grades
+    # Prepare data for prompt - pass empty dicts or empty lists if missing
+    team1_last_match_data = {
+        "player_grades": player_grades_home_all,
+        "match_data": match_data_home or {}
     }
-    team2_last_match = {
-        "match_data": match_data_away,
-        "player_grades": team2_player_grades
+    team2_last_match_data = {
+        "player_grades": player_grades_away_all,
+        "match_data": match_data_away or {}
     }
 
-    # Format prompt
-    prompt = format_gemini_match_preview_prompt(home_standings, away_standings, team1_last_match, team2_last_match)
+    # Build prompt with all available data
+    prompt = format_gemini_match_preview_prompt(
+        team1_standings=team1_standings,
+        team2_standings=team2_standings,
+        team1_last_match=team1_last_match_data,
+        team2_last_match=team2_last_match_data
+    )
 
-    # Call Gemini
-    preview_text = call_gemini_api(prompt)
-    return preview_text
+    # Now call Gemini API with prompt (your existing code)...
+
+    # Example placeholder for API call and response:
+    # response_text = call_gemini_api(prompt)
+
+    # return response_text or whatever you want to do with it
+    return prompt  # or response_text if you add the API call here
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
