@@ -489,7 +489,7 @@ def generate_standings_summary(standings, league_name):
 
     # 🏆 True leader based on tiebreakers
     leader = standings[0]
-    summary += f"🏆 {leader['team']} leads the league with {leader['points']} points.\n\n"
+    summary += f"🏆 {leader['team']} lead the league with {leader['points']} points.\n\n"
 
     # ⚔️ In the Hunt: teams within 4 points of leader, excluding leader
     hunt_pack = []
