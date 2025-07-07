@@ -702,29 +702,29 @@ def groupme_webhook():
 
     # 🟣 3. Handle TV Schedule Requests
     if any(bot_name in text_lower for bot_name in bot_aliases):
-    if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "kzhedule", "schedule", "guide", "games"]):
-        sys.stderr.write("✅ Triggered TV schedule command.\n")
-        send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon this week...")
-
-        session = get_logged_in_session()
-        if not session:
-            send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
+        if "fsg" in text_lower and any(kw in text_lower for kw in ["tv", "kzhedule", "schedule", "guide", "games"]):
+            sys.stderr.write("✅ Triggered TV schedule command.\n")
+            send_groupme_message("Ay y'all! Here's what's coming up on FoxSportsGoon this week...")
+    
+            session = get_logged_in_session()
+            if not session:
+                send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
+                return "ok", 200
+    
+            goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
+            spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
+    
+            # FIXED: Scrape fixtures fully
+            goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
+            spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
+    
+            # Generate and send TV schedule
+            tv_schedule = generate_tv_schedule_from_upcoming(
+                goon_fixtures, spoon_fixtures,
+                goon_standings, spoon_standings
+            )
+            send_groupme_message(tv_schedule)
             return "ok", 200
-
-        goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-        spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-
-        # FIXED: Scrape fixtures fully
-        goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
-        spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
-
-        # Generate and send TV schedule
-        tv_schedule = generate_tv_schedule_from_upcoming(
-            goon_fixtures, spoon_fixtures,
-            goon_standings, spoon_standings
-        )
-        send_groupme_message(tv_schedule)
-        return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
