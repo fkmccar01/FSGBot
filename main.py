@@ -616,17 +616,18 @@ def get_last_match_for_team(team_name, league_urls):
 
 def find_team_standing(team_name, standings):
     normalized = normalize(team_name)
+
+    # First try: exact normalized match
     for s in standings:
-        s_name = s.get("team_name", "")
-        norm_s_name = normalize(s_name)
-        if norm_s_name == normalized:
+        if normalize(s.get("team_name", "")) == normalized:
             return s
-    # Debug log if no match found
-    print(f"❌ No match found for team '{team_name}' → normalized: '{normalized}'")
-    print("🔍 Standings teams available:")
+
+    # Second try: partial/fuzzy match (e.g., "veeder" in "mount veeder")
     for s in standings:
-        s_name = s.get("team_name", "")
-        print(f"  - Raw: '{s_name}' → Normalized: '{normalize(s_name)}'")
+        candidate = normalize(s.get("team_name", ""))
+        if normalized in candidate or candidate in normalized:
+            return s
+
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
