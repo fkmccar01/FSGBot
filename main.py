@@ -461,34 +461,32 @@ def scrape_league_standings_with_login(session, league_url):
         try:
             place = int(cols[0].text.strip().strip("."))
             team_link = cols[2].find("a")
-            team_name = team_link.text.strip() if team_link else cols[2].text.strip()  # fallback to text if no <a>
-
-            # Parse GF and GA from the "GF - GA" column (usually index 9)
-            gf_ga_text = cols[9].text.strip()
-            # Split by " - " or "-"
-            if " - " in gf_ga_text:
-                gf_text, ga_text = gf_ga_text.split(" - ")
-            elif "-" in gf_ga_text:
-                gf_text, ga_text = gf_ga_text.split("-")
-            else:
-                raise ValueError(f"Unexpected GF-GA format: {gf_ga_text}")
-
-            gf = int(gf_text.strip())
-            ga = int(ga_text.strip())
-
+            team_name = team_link.text.strip() if team_link else cols[2].text.strip()
+            
+            wins = int(cols[5].text.strip())
+            draws = int(cols[6].text.strip())
+            losses = int(cols[7].text.strip())
+            
+            gf_ga = cols[9].text.strip()  # e.g. "9 - 5"
+            gf, ga = [int(x.strip()) for x in gf_ga.split("-")]
+            
             diff_text = cols[10].text.strip().replace("+", "")
             diff = int(diff_text)
-
+            
             points = int(cols[11].text.strip())
-
+            
             standings.append({
                 "place": place,
                 "team": team_name,
-                "points": points,
-                "diff": diff,
+                "wins": wins,
+                "draws": draws,
+                "losses": losses,
                 "gf": gf,
-                "ga": ga
+                "ga": ga,
+                "diff": diff,
+                "points": points
             })
+
         except Exception as e:
             sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
             continue
