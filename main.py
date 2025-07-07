@@ -884,7 +884,7 @@ def groupme_webhook():
         resolved_team = resolve_team_name(text, team_mapping)
         send_groupme_message("Preview? We talkin' 'bout previews? Jk y'all, let's get it...")
         if not resolved_team:
-            send_groupme_message("Sorry, I couldn't find that team in my records.")
+            send_groupme_message("Ay yo, who?? I ain't never heard of that team.")
             return "ok", 200
     
         session = get_logged_in_session()
