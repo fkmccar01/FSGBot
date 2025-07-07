@@ -615,17 +615,12 @@ def get_last_match_for_team(team_name, league_urls):
     return None
 
 def find_team_standing(team_name, standings):
-    normalized_team = normalize(team_name)
-    # First try to resolve the normalized name to the official team name using your alias mapping
-    official_name = resolve_team_name(normalized_team, team_mapping)
-    if not official_name:
-        official_name = team_name  # fallback to original if no alias mapping
-    
-    normalized_official = normalize(official_name)
-    
-    for entry in standings:
-        if normalize(entry["team"]) == normalized_official:
-            return entry
+    normalized = normalize(team_name)
+    for s in standings:
+        standing_name = s.get("team_name", "")
+        if normalize(standing_name) == normalized:
+            return s
+    print(f"⚠️ Could not find standing for team: '{team_name}' normalized as '{normalized}'")
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
