@@ -689,9 +689,8 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
         prompt = format_gemini_match_preview_prompt(
             home_standing,
             away_standing,
-            last_match=None,
-            # Pass None for last match info to signal no recent match
-            last_match=None,
+            team1_last_match=None,  # for home team
+            team2_last_match=None,  # for away team
         )
         return call_gemini_api(prompt)
 
