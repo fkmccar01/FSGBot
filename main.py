@@ -492,9 +492,6 @@ def scrape_league_standings_with_login(session, league_url):
             continue
 
     return standings
-            except Exception as e:
-            sys.stderr.write(f"⚠️ Error parsing standings row: {e}\n")
-            continue
 
 def generate_standings_summary(standings, league_name):
     if not standings:
