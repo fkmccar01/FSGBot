@@ -454,7 +454,7 @@ def scrape_league_standings_with_login(session, league_url):
     standings = []
     for row in rows:
         cols = row.find_all("td")
-        if len(cols) < 10:
+        if len(cols) < 12:  # Because we need up to index 11
             continue
         try:
             place = int(cols[0].text.strip().strip("."))
@@ -466,16 +466,17 @@ def scrape_league_standings_with_login(session, league_url):
             draws = int(cols[5].text.strip())
             losses = int(cols[6].text.strip())
     
-            # GF and GA are combined in cols[7], e.g. "9 - 5"
-            gf_ga_text = cols[7].text.strip()
-            gf_str, ga_str = gf_ga_text.split("-")
-            gf = int(gf_str.strip())
-            ga = int(ga_str.strip())
+            gf = int(cols[7].text.strip())
+            # cols[8] is dash "-", so skip or verify it equals "-"
+            if cols[8].text.strip() != "-":
+                sys.stderr.write("⚠️ Unexpected format in GF-GA separator column.\n")
+                continue
+            ga = int(cols[9].text.strip())
     
-            diff_text = cols[8].text.strip().replace("+", "")
+            diff_text = cols[10].text.strip().replace("+", "")
             diff = int(diff_text)
     
-            points = int(cols[9].text.strip())
+            points = int(cols[11].text.strip())
     
             standings.append({
                 "place": place,
