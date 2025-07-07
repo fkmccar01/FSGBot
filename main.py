@@ -56,6 +56,11 @@ def resolve_team_name(text, team_mapping):
 
 def send_groupme_message(text):
     url = "https://api.groupme.com/v3/bots/post"
+    
+    # ✅ Enforce 1000 character limit
+    if len(text) > 1000:
+        text = text[:997] + "..."
+
     payload = {
         "bot_id": GROUPME_BOT_ID,
         "text": text
