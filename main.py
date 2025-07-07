@@ -767,12 +767,17 @@ def enrich_match_with_data(match, all_standings, league_urls):
     home_team = match["home_team"]
     away_team = match["away_team"]
 
-    # Find standings for home and away teams
     def find_team_standing(team_name, standings):
         normalized = normalize(team_name)
         for s in standings:
-            if normalize(s.get("team_name", "")) == normalized:
+            s_name = s.get("team_name", "")
+            norm_s_name = normalize(s_name)
+            if norm_s_name == normalized:
                 return s
+        # Debug print if not found
+        print(f"❌ Standing NOT found for '{team_name}' (normalized '{normalized}'). Available teams:")
+        for s in standings:
+            print(f"  - '{s.get('team_name', '')}' normalized '{normalize(s.get('team_name', ''))}'")
         return None
 
     home_standing = find_team_standing(home_team, all_standings)
