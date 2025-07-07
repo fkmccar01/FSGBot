@@ -883,7 +883,7 @@ def calculate_team_strength(standing, last_match, team_name):
 
     return strength
 
-    def generate_drafkzar_odds(leagues):
+def generate_drafkzar_odds(leagues):
     def compute_odds(home_strength, away_strength):
         total = home_strength + away_strength
         if total == 0:
