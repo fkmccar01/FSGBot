@@ -630,16 +630,9 @@ def get_last_match_for_team(team_name, league_urls):
     return None
 
 def find_team_standing(team_name, standings):
-    if not team_name:
-        return None
-    normalized_team = normalize(team_name)
-    official_name = resolve_team_name(text, profiles)
-    if not official_name:
-        official_name = team_name  # fallback
-    normalized_official = normalize(official_name)
-    for entry in standings:
-        if normalize(entry["team"]) == normalized_official:
-            return entry
+    for team in standings:
+        if normalize(team["team"]) == normalize(team_name):
+            return team
     return None
 
 def format_gemini_match_preview_prompt(team1_standings, team2_standings, team1_last_match, team2_last_match):
