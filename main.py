@@ -800,6 +800,8 @@ def groupme_webhook():
     data = request.get_json()
     sys.stderr.write(f"Webhook data received: {data}\n")
 
+    session = requests.Session()
+
     if not data:
         return "No data received", 400
 
@@ -809,8 +811,6 @@ def groupme_webhook():
 
     if sender_type == "bot":
         return "Ignoring bot message"
-
-    text_lower = text.lower()
 
     # 🟢 1. Handle League Recap Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and any(k in text_lower for k in ["recap", "update"]) and ("goondesliga" in text_lower or "spoondesliga" in text_lower):
@@ -963,10 +963,19 @@ def groupme_webhook():
         if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "assists", "points","x11", "mvp", "league leaders"]):
             sys.stderr.write("✅ Triggered stat leaderboard command.\n")
             send_groupme_message("Yo these dudes ain't my 🐐 Dougie Maradonut but...")
+
+            session = get_logged_in_session()
+            if not session:
+                send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
+                return "ok", 200
     
             # Determine league
-            league_name = "goondesliga" if "spoon" not in text_lower else "spoondesliga"
-            league_id = 460905 if league_name == "goondesliga" else 460906
+            if "spoon" in text_lower:
+                league_name = "spoondesliga"
+                league_id = 460906
+            else:
+                league_name = "goondesliga"
+                league_id = 460905
     
             # Determine which stat category was asked for
             if "golden boot" in text_lower or "goals" in text_lower or "top scorers" in text_lower:
@@ -1005,7 +1014,7 @@ def groupme_webhook():
                     "MVP 🏅": scrape_league_stat_category(session, league_id, "x11", top_n=1)
                 }
     
-                message = f"{league_name.title()} Leaders:*\n"
+                message = f"{league_name.title()} Leaders:\n"
                 for label, players in leaderboard.items():
                     if players:
                         message += f"{label}: {players[0]}\n"
