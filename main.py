@@ -758,46 +758,35 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
 
     rows = table.find_all("tr")[1:]  # skip header
 
-    top_players = []
+    players = []
 
-    # Print all rows for debugging
     for i, row in enumerate(rows):
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
-        rank = cols[0].get_text(strip=True)
         player = cols[1].get_text(strip=True)
         team = cols[2].get_text(strip=True)
-        value = cols[4].get_text(strip=True)
-        sys.stderr.write(f"Row {i}: Rank={rank}, Player={player}, Team={team}, Value={value}\n")
-
-    # Now do your original logic (e.g., top_n=1 pick only rank == 1)
-    if top_n == 1:
-        for row in rows:
-            cols = row.find_all("td")
-            if len(cols) < 5:
-                continue
-            rank = cols[0].get_text(strip=True)
-            if rank == "1":
-                player = cols[1].get_text(strip=True)
-                team = cols[2].get_text(strip=True)
-                value = cols[4].get_text(strip=True)
-                top_players.append(f"{player} ({team}) - {value}")
-        return top_players[:1]
-
-    # For top_n > 1 fallback
-    count = 0
-    for row in rows:
-        if count >= top_n:
-            break
-        cols = row.find_all("td")
-        if len(cols) < 5:
+        value_text = cols[4].get_text(strip=True)
+        
+        # Extract numeric part of value, e.g. "5 (0)" -> 5
+        m = re.match(r"(\d+)", value_text)
+        if not m:
             continue
-        player = cols[1].get_text(strip=True)
-        team = cols[2].get_text(strip=True)
-        value = cols[4].get_text(strip=True)
-        top_players.append(f"{player} ({team}) - {value}")
-        count += 1
+        value_num = int(m.group(1))
+
+        players.append({
+            "player": player,
+            "team": team,
+            "value_text": value_text,
+            "value_num": value_num
+        })
+
+    # Sort descending by value_num
+    players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
+
+    top_players = []
+    for p in players_sorted[:top_n]:
+        top_players.append(f"{p['player']} ({p['team']}) - {p['value_text']}")
 
     return top_players
 
