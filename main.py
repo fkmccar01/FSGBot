@@ -958,12 +958,11 @@ def groupme_webhook():
         send_groupme_message(preview_text[:1500])  # limit message size to 1500 chars
         return "ok", 200
 
-    return "ok", 200
-
     # 🟢 5. Handle League Leaders
     if any(bot_name in text_lower for bot_name in bot_aliases):
         if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "assists", "points","x11", "mvp", "league leaders"]):
             sys.stderr.write("✅ Triggered stat leaderboard command.\n")
+            send_groupme_message("Yo these dudes ain't my 🐐 Dougie Maradonut but...")
     
             # Determine league
             league_name = "goondesliga" if "spoon" not in text_lower else "spoondesliga"
@@ -989,12 +988,14 @@ def groupme_webhook():
             if category:
                 top_players = scrape_league_stat_category(session, league_id, category, top_n=5)
                 if not top_players:
-                    send_groupme_message(f"Couldn't fetch {title} leaderboard right now 😕")
+                    send_groupme_message(f"Couldn't fetch {title} leaderboard right now yo")
+                    return "ok", 200
                 else:
                     message = f"{title} Leaders ({league_name.title()}):\n"
                     for i, player in enumerate(top_players, 1):
                         message += f"{i}. {player}\n"
                     send_groupme_message(message.strip())
+                    return "ok", 200
             else:
                 # General "league leaders" request
                 leaderboard = {
@@ -1009,6 +1010,9 @@ def groupme_webhook():
                     if players:
                         message += f"{label}: {players[0]}\n"
                 send_groupme_message(message.strip())
+                return "ok", 200
+
+    return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
