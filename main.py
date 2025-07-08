@@ -758,9 +758,10 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
         return []
 
     top_players = []
-    rows = table.find_all("tr")[1:1+top_n]  # Skip header
-
-    for row in rows:
+    rows = table.find_all("tr")[1:]  # Skip header row
+    top_rows = rows[:top_n]          # Get top N actual players
+    
+    for row in top_rows:
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
@@ -768,6 +769,10 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
         team = cols[2].get_text(strip=True)
         value = cols[4].get_text(strip=True)
         top_players.append(f"{player} ({team}) - {value}")
+
+    for i, row in enumerate(table.find_all("tr")):
+        cols = [td.get_text(strip=True) for td in row.find_all("td")]
+        sys.stderr.write(f"Row {i}: {cols}\n")
 
     return top_players
 
