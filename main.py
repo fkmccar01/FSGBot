@@ -804,6 +804,7 @@ def groupme_webhook():
         return "No data received", 400
 
     text = data.get("text", "")
+    text_lower = text.lower()
     sender_type = data.get("sender_type", "")
 
     if sender_type == "bot":
