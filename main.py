@@ -975,7 +975,7 @@ def groupme_webhook():
             elif "assists" in text_lower:
                 category = "assists"
                 title = "Assists 🎩🪄"
-            elif ""points" in text_lower:
+            elif "points" in text_lower:
                 category = "points"
                 title = "Points 💎"
             elif "x11" in text_lower or "mvp" in text_lower:
