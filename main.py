@@ -959,9 +959,9 @@ def groupme_webhook():
 
     return "ok", 200
 
-    # 🟢 4. Handle Match Preview Requests
+    # 🟢 5. Handle League Leaders
     if any(bot_name in text_lower for bot_name in bot_aliases):
-        if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "magician", "assists", "points", "all-star", "x11", "mvp", "league leaders"]):
+        if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "assists", "points","x11", "mvp", "league leaders"]):
             sys.stderr.write("✅ Triggered stat leaderboard command.\n")
     
             # Determine league
@@ -1003,7 +1003,7 @@ def groupme_webhook():
                     "MVP 🏅": scrape_league_stat_category(session, league_id, "x11", top_n=1)
                 }
     
-                message = f"🏅 *{league_name.title()} Leaders:*\n"
+                message = f"{league_name.title()} Leaders:*\n"
                 for label, players in leaderboard.items():
                     if players:
                         message += f"{label}: {players[0]}\n"
