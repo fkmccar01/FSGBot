@@ -760,7 +760,7 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
 
     players = []
 
-   for i, row in enumerate(rows):
+    for i, row in enumerate(rows):
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
