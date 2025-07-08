@@ -751,17 +751,34 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
         return []
 
     soup = BeautifulSoup(response.text, "html.parser")
-
     table = soup.find("table", id="ctl00_cphMain_dgStats")
     if not table:
         sys.stderr.write(f"⚠️ Could not find stats table for category: {category}\n")
         return []
 
+    rows = table.find_all("tr")[1:]  # skip header
+
     top_players = []
-    rows = table.find_all("tr")[1:]  # Skip header row
-    top_rows = rows[:top_n]          # Get top N actual players
-    
-    for row in top_rows:
+
+    # If top_n=1, pick only players with rank == "1"
+    if top_n == 1:
+        for row in rows:
+            cols = row.find_all("td")
+            if len(cols) < 5:
+                continue
+            rank = cols[0].get_text(strip=True)
+            if rank == "1":
+                player = cols[1].get_text(strip=True)
+                team = cols[2].get_text(strip=True)
+                value = cols[4].get_text(strip=True)
+                top_players.append(f"{player} ({team}) - {value}")
+        return top_players[:1]
+
+    # Otherwise, just take top_n rows with valid data
+    count = 0
+    for row in rows:
+        if count >= top_n:
+            break
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
@@ -769,10 +786,7 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
         team = cols[2].get_text(strip=True)
         value = cols[4].get_text(strip=True)
         top_players.append(f"{player} ({team}) - {value}")
-
-    for i, row in enumerate(table.find_all("tr")):
-        cols = [td.get_text(strip=True) for td in row.find_all("td")]
-        sys.stderr.write(f"Row {i}: {cols}\n")
+        count += 1
 
     return top_players
 
