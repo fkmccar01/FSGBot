@@ -760,20 +760,19 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
 
     players = []
 
-    for i, row in enumerate(rows):
+   for i, row in enumerate(rows):
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
         player = cols[1].get_text(strip=True)
-        team = cols[2].get_text(strip=True)
+        team = cols[3].get_text(strip=True)   # FIXED index here
         value_text = cols[4].get_text(strip=True)
         
-        # Extract numeric part of value, e.g. "5 (0)" -> 5
         m = re.match(r"(\d+)", value_text)
         if not m:
             continue
         value_num = int(m.group(1))
-
+    
         players.append({
             "player": player,
             "team": team,
