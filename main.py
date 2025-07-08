@@ -760,7 +760,18 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
 
     top_players = []
 
-    # If top_n=1, pick only players with rank == "1"
+    # Print all rows for debugging
+    for i, row in enumerate(rows):
+        cols = row.find_all("td")
+        if len(cols) < 5:
+            continue
+        rank = cols[0].get_text(strip=True)
+        player = cols[1].get_text(strip=True)
+        team = cols[2].get_text(strip=True)
+        value = cols[4].get_text(strip=True)
+        sys.stderr.write(f"Row {i}: Rank={rank}, Player={player}, Team={team}, Value={value}\n")
+
+    # Now do your original logic (e.g., top_n=1 pick only rank == 1)
     if top_n == 1:
         for row in rows:
             cols = row.find_all("td")
@@ -774,7 +785,7 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
                 top_players.append(f"{player} ({team}) - {value}")
         return top_players[:1]
 
-    # Otherwise, just take top_n rows with valid data
+    # For top_n > 1 fallback
     count = 0
     for row in rows:
         if count >= top_n:
