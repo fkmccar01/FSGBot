@@ -732,6 +732,45 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
     preview_text = call_gemini_api(prompt)
     return preview_text
 
+def scrape_league_stat_category(session, league_id, category, top_n=5):
+    sel_map = {
+        "goals": "S",
+        "assists": "A",
+        "points": "P",
+        "x11": "X"
+    }
+
+    sel = sel_map.get(category)
+    if not sel:
+        return []
+
+    url = f"https://www.xperteleven.com/stats.aspx?Lid={league_id}&Sel={sel}&Lnr=1&Period=S&dh=2"
+    response = session.get(url)
+    if response.status_code != 200:
+        sys.stderr.write(f"⚠️ Failed to fetch {category} stats: {response.status_code}\n")
+        return []
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    table = soup.find("table", id="ctl00_cphMain_dgStats")
+    if not table:
+        sys.stderr.write(f"⚠️ Could not find stats table for category: {category}\n")
+        return []
+
+    top_players = []
+    rows = table.find_all("tr")[1:1+top_n]  # Skip header
+
+    for row in rows:
+        cols = row.find_all("td")
+        if len(cols) < 5:
+            continue
+        player = cols[1].get_text(strip=True)
+        team = cols[2].get_text(strip=True)
+        value = cols[4].get_text(strip=True)
+        top_players.append(f"{player} ({team}) - {value}")
+
+    return top_players
+
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
     session = get_logged_in_session()
@@ -880,7 +919,7 @@ def groupme_webhook():
             send_groupme_message(tv_schedule)
             return "ok", 200
 
-    # 🟣 4. Handle Match Preview Requests
+    # 🟠 4. Handle Match Preview Requests
     if any(bot_name in text_lower for bot_name in bot_aliases) and "preview" in text_lower:
         # Extract team name from message (attempt)
         resolved_team = resolve_team_name(text, team_mapping)
@@ -919,6 +958,56 @@ def groupme_webhook():
         return "ok", 200
 
     return "ok", 200
+
+    # 🟢 4. Handle Match Preview Requests
+    if any(bot_name in text_lower for bot_name in bot_aliases):
+        if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "magician", "assists", "points", "all-star", "x11", "mvp", "league leaders"]):
+            sys.stderr.write("✅ Triggered stat leaderboard command.\n")
+    
+            # Determine league
+            league_name = "goondesliga" if "spoon" not in text_lower else "spoondesliga"
+            league_id = 460905 if league_name == "goondesliga" else 460906
+    
+            # Determine which stat category was asked for
+            if "golden boot" in text_lower or "goals" in text_lower or "top scorers" in text_lower:
+                category = "goals"
+                title = "Golden Boot 👟"
+            elif "assists" in text_lower:
+                category = "assists"
+                title = "Assists 🎩🪄"
+            elif ""points" in text_lower:
+                category = "points"
+                title = "Points 💎"
+            elif "x11" in text_lower or "mvp" in text_lower:
+                category = "x11"
+                title = "MVP 🏅"
+            else:
+                category = None  # fallback to league leaders summary
+    
+            # One stat category requested
+            if category:
+                top_players = scrape_league_stat_category(session, league_id, category, top_n=5)
+                if not top_players:
+                    send_groupme_message(f"Couldn't fetch {title} leaderboard right now 😕")
+                else:
+                    message = f"{title} Leaders ({league_name.title()}):\n"
+                    for i, player in enumerate(top_players, 1):
+                        message += f"{i}. {player}\n"
+                    send_groupme_message(message.strip())
+            else:
+                # General "league leaders" request
+                leaderboard = {
+                    "Golden Boot 👟": scrape_league_stat_category(session, league_id, "goals", top_n=1),
+                    "Assists 🎩🪄": scrape_league_stat_category(session, league_id, "assists", top_n=1),
+                    "Points 💎": scrape_league_stat_category(session, league_id, "points", top_n=1),
+                    "MVP 🏅": scrape_league_stat_category(session, league_id, "x11", top_n=1)
+                }
+    
+                message = f"🏅 *{league_name.title()} Leaders:*\n"
+                for label, players in leaderboard.items():
+                    if players:
+                        message += f"{label}: {players[0]}\n"
+                send_groupme_message(message.strip())
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
