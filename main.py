@@ -382,33 +382,8 @@ def scrape_and_summarize_by_game_id(game_id):
         prompt = format_gemini_prompt(match_data, events, player_grades)
         return call_gemini_api(prompt)
 
-def get_match_summary_and_grades(game_id):
-    login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
-
-    with requests.Session() as session:
-        login_page = session.get(login_url)
-        login_soup = BeautifulSoup(login_page.text, "html.parser")
-        try:
-            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
-            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
-            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
-        except Exception:
-            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
-            return "[Login form fields missing.]", []
-
-        login_payload = {
-            "__VIEWSTATE": viewstate,
-            "__VIEWSTATEGENERATOR": viewstategen,
-            "__EVENTVALIDATION": eventvalidation,
-            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
-            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
-            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
-        }
-
-        login_response = session.post(login_url, data=login_payload)
-        if "Logout" not in login_response.text:
-            return "[Login failed.]", []
+def get_match_summary_and_grades(session, game_id):
+        match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
 
         match_html = scrape_match_html(session, match_url)
         if not match_html:
