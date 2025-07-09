@@ -977,7 +977,7 @@ def groupme_webhook():
         return "ok", 200
 
     # 🟢 5. Handle League Leaders
-if any(bot_name in text_lower for bot_name in bot_aliases):
+    if any(bot_name in text_lower for bot_name in bot_aliases):
     if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "assists", "points", "x11", "mvp", "league leaders"]):
         sys.stderr.write("✅ Triggered stat leaderboard command.\n")
         send_groupme_message("Yo these dudes ain't my 🐐 Dougie Maradonut but...")
