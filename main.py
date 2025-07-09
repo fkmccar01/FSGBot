@@ -764,7 +764,6 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
-        first_row = rows[0]
         player = cols[1].get_text(strip=True)
         team = cols[3].get_text(strip=True)   # FIXED index here
         value_text = cols[4].get_text(strip=True)
