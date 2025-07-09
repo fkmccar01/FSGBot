@@ -1180,15 +1180,14 @@ def groupme_webhook():
                 send_groupme_message("⚠️ Could not log in to Xpert Eleven to fetch odds.")
                 return "OK", 200
     
-            # Use the global URLs — do NOT redefine
             goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
             spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
     
             goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
             spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
     
-            goon_last_match_data = build_last_match_data_by_team(goon_standings, session, GOONDESLIGA_URL)
-            spoon_last_match_data = build_last_match_data_by_team(spoon_standings, session, SPOONDESLIGA_URL)
+            goon_last_match_data = build_last_match_data_by_team(session, goon_fixtures, goon_standings, [GOONDESLIGA_URL])
+            spoon_last_match_data = build_last_match_data_by_team(session, spoon_fixtures, spoon_standings, [SPOONDESLIGA_URL])
     
             goon_odds_text = generate_drafkzar_odds(goon_fixtures, goon_standings, goon_last_match_data)
             spoon_odds_text = generate_drafkzar_odds(spoon_fixtures, spoon_standings, spoon_last_match_data)
