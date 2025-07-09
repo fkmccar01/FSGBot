@@ -790,22 +790,56 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
 
     return top_players
 
+def build_last_match_data_by_team(session, fixtures, standings, league_urls):
+    last_match_data = {}
 
-# These lines are wrongly indented in your version — this is where they go:
-goon_odds_text = generate_drafkzar_odds(goon_fixtures, goon_standings, goon_last_match_data)
-spoon_odds_text = generate_drafkzar_odds(spoon_fixtures, spoon_standings, spoon_last_match_data)
+    for match in fixtures:
+        for team in [match["home_team"], match["away_team"]]:
+            if team in last_match_data:
+                continue  # Skip if already processed
 
-# Compose full message
-full_message = (
-    "DrafKzar™️ Goondesliga Odds 💵🎲\n\n"
-    + goon_odds_text
-    + "\n\n"
-    + "DrafKzar™️ Spoondesliga Odds 💵🎲\n\n"
-    + spoon_odds_text
-)
+            last_match = get_last_match_for_team(team, league_urls)
+            if not last_match:
+                continue
 
-send_groupme_message(full_message)
-return "OK", 200
+            _, grades, match_data = get_match_summary_and_grades(session, last_match["game_id"])
+            if not grades or not match_data:
+                continue
+
+            team_grades = [p["grade"] for p in grades if p["team"] == team and p["grade"] is not None]
+            if not team_grades:
+                continue
+
+            avg_rating = round(sum(team_grades) / len(team_grades), 2)
+
+            home = match_data["home_team"]
+            away = match_data["away_team"]
+            hs = int(match_data["home_score"])
+            as_ = int(match_data["away_score"])
+
+            # Goal difference from this team’s perspective
+            if normalize(team) == normalize(home):
+                goal_diff = hs - as_
+            elif normalize(team) == normalize(away):
+                goal_diff = as_ - hs
+            else:
+                continue  # Team not found in match (shouldn't happen)
+
+            # Match result
+            if goal_diff > 0:
+                result = "win"
+            elif goal_diff < 0:
+                result = "loss"
+            else:
+                result = "draw"
+
+            last_match_data[team] = {
+                "result": result,
+                "avg_rating": avg_rating,
+                "goal_diff": goal_diff
+            }
+
+    return last_match_data
 
 def build_last_match_data_by_team(session, fixtures, standings, league_urls):
     last_match_data = {}
