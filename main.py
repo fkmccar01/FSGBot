@@ -749,7 +749,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
         return []
     
     sys.stderr.write(f"DEBUG: URL fetched: {url}\n")
-    sys.stderr.write(f"DEBUG: Page snippet:\n{response.text[:1000]}\n")  # print first 1000 chars
+    sys.stderr.write(f"DEBUG: Page snippet:\n{response.text[:1000]}\n")
     
     soup = BeautifulSoup(response.text, "html.parser")
     table = soup.find("table", id="ctl00_cphMain_dgStats")
@@ -781,7 +781,8 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
             "value_text": value_text,
             "value_num": value_num
         })
-    
+
+    # Sorting and top selection happens AFTER collecting all players
     players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
     top_players = []
 
@@ -841,69 +842,18 @@ def build_last_match_data_by_team(session, fixtures, standings, league_urls):
 
     return last_match_data
 
-def build_last_match_data_by_team(session, fixtures, standings, league_urls):
-    last_match_data = {}
-
-    for match in fixtures:
-        for team in [match["home_team"], match["away_team"]]:
-            if team in last_match_data:
-                continue  # Skip if already processed
-
-            last_match = get_last_match_for_team(team, league_urls)
-            if not last_match:
-                continue
-
-            _, grades, match_data = get_match_summary_and_grades(session, last_match["game_id"])
-            if not grades or not match_data:
-                continue
-
-            team_grades = [p["grade"] for p in grades if p["team"] == team and p["grade"] is not None]
-            if not team_grades:
-                continue
-
-            avg_rating = round(sum(team_grades) / len(team_grades), 2)
-
-            home = match_data["home_team"]
-            away = match_data["away_team"]
-            hs = int(match_data["home_score"])
-            as_ = int(match_data["away_score"])
-
-            # Goal difference from this team’s perspective
-            if normalize(team) == normalize(home):
-                goal_diff = hs - as_
-            elif normalize(team) == normalize(away):
-                goal_diff = as_ - hs
-            else:
-                continue  # Team not found in match (shouldn't happen)
-
-            # Match result
-            if goal_diff > 0:
-                result = "win"
-            elif goal_diff < 0:
-                result = "loss"
-            else:
-                result = "draw"
-
-            last_match_data[team] = {
-                "result": result,
-                "avg_rating": avg_rating,
-                "goal_diff": goal_diff
-            }
-
-    return last_match_data
-
 def decimal_to_american(decimal_odds):
     if decimal_odds >= 2.0:
         return f"+{int(round((decimal_odds - 1) * 100))}"
     else:
         return f"{int(round(-100 / (decimal_odds - 1)))}"
 
-def generate_drafkzar_odds(fixtures, standings_data, last_match_results, last_match_ratings):
+def generate_drafkzar_odds(fixtures, standings_data, last_match_data):
     odds_output = "DrafKzars™️ Odds for Upcoming Matches 💵🎲:\n\n"
 
     for fixture in fixtures:
-        home = fixture["home"]
-        away = fixture["away"]
+        home = fixture["home_team"] if "home_team" in fixture else fixture.get("home")
+        away = fixture["away_team"] if "away_team" in fixture else fixture.get("away")
 
         home_stats = standings_data.get(home)
         away_stats = standings_data.get(away)
@@ -915,9 +865,12 @@ def generate_drafkzar_odds(fixtures, standings_data, last_match_results, last_ma
         home_strength = home_stats["points"] + home_stats["diff"] * 0.1
         away_strength = away_stats["points"] + away_stats["diff"] * 0.1
 
-        # Strength boost from last result
-        home_result = last_match_results.get(home)
-        away_result = last_match_results.get(away)
+        # Strength boost from last match result
+        home_info = last_match_data.get(home, {})
+        away_info = last_match_data.get(away, {})
+
+        home_result = home_info.get("result")
+        away_result = away_info.get("result")
 
         if home_result == "win":
             home_strength += 2
@@ -930,12 +883,11 @@ def generate_drafkzar_odds(fixtures, standings_data, last_match_results, last_ma
             away_strength += 1
 
         # Strength boost from average player rating
-        home_ratings = last_match_ratings.get(home, [])
-        away_ratings = last_match_ratings.get(away, [])
-        if home_ratings:
-            home_strength += sum(home_ratings) / len(home_ratings)
-        if away_ratings:
-            away_strength += sum(away_ratings) / len(away_ratings)
+        home_avg_rating = home_info.get("avg_rating", 0)
+        away_avg_rating = away_info.get("avg_rating", 0)
+
+        home_strength += home_avg_rating
+        away_strength += away_avg_rating
 
         total_strength = home_strength + away_strength
         if total_strength == 0:
