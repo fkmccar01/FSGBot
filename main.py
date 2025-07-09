@@ -383,62 +383,6 @@ def scrape_and_summarize_by_game_id(game_id):
         prompt = format_gemini_prompt(match_data, events, player_grades)
         return call_gemini_api(prompt)
 
-def get_match_data_only(game_id):
-    login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
-
-    with requests.Session() as session:
-        # Load login page for hidden fields
-        login_page = session.get(login_url)
-        login_soup = BeautifulSoup(login_page.text, "html.parser")
-        try:
-            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
-            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
-            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
-        except Exception:
-            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
-            return None
-
-        # Login payload
-        login_payload = {
-            "__VIEWSTATE": viewstate,
-            "__VIEWSTATEGENERATOR": viewstategen,
-            "__EVENTVALIDATION": eventvalidation,
-            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
-            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
-            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
-        }
-        login_response = session.post(login_url, data=login_payload)
-        if "Logout" not in login_response.text:
-            sys.stderr.write("⚠️ Login failed.\n")
-            return None
-
-        # Fetch match page
-        match_response = session.get(match_url)
-        if match_response.status_code != 200:
-            sys.stderr.write(f"⚠️ Failed to retrieve match page: {match_response.status_code}\n")
-            return None
-
-        soup = BeautifulSoup(match_response.text, "html.parser")
-
-        home_team_tag = soup.find(id="ctl00_cphMain_lblHomeTeam")
-        away_team_tag = soup.find(id="ctl00_cphMain_lblAwayTeam")
-        home_score_tag = soup.find(id="ctl00_cphMain_lblHomeScore")
-        away_score_tag = soup.find(id="ctl00_cphMain_lblAwayScore")
-
-        if not all([home_team_tag, away_team_tag, home_score_tag, away_score_tag]):
-            sys.stderr.write("⚠️ Could not find all match info on page.\n")
-            return None
-
-        match_data = {
-            "home_team": home_team_tag.text.strip(),
-            "away_team": away_team_tag.text.strip(),
-            "home_score": int(home_score_tag.text.strip()),
-            "away_score": int(away_score_tag.text.strip()),
-        }
-
-        return match_data
-
 def get_match_summary_and_grades(game_id):
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
@@ -669,59 +613,6 @@ def get_last_match_for_team(team_name, league_urls):
                 return match
     return None
 
-def get_player_grades_only(game_id):
-    login_url = "https://www.xperteleven.com/front_new3.aspx"
-    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
-
-    with requests.Session() as session:
-        # Step 1: Load login page and get hidden fields
-        login_page = session.get(login_url)
-        login_soup = BeautifulSoup(login_page.text, "html.parser")
-        try:
-            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
-            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
-            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
-        except Exception:
-            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
-            return []
-
-        # Step 2: Login payload and login post
-        login_payload = {
-            "__VIEWSTATE": viewstate,
-            "__VIEWSTATEGENERATOR": viewstategen,
-            "__EVENTVALIDATION": eventvalidation,
-            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
-            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
-            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
-        }
-        login_response = session.post(login_url, data=login_payload)
-        if "Logout" not in login_response.text:
-            sys.stderr.write("⚠️ Login failed.\n")
-            return []
-
-        # Step 3: Fetch the match page
-        match_response = session.get(match_url)
-        if match_response.status_code != 200:
-            sys.stderr.write(f"⚠️ Failed to retrieve match page: {match_response.status_code}\n")
-            return []
-
-        soup = BeautifulSoup(match_response.text, "html.parser")
-
-        # Step 4: Parse home and away team names
-        home_team_tag = soup.find(id="ctl00_cphMain_lblHomeTeam")
-        away_team_tag = soup.find(id="ctl00_cphMain_lblAwayTeam")
-        if not home_team_tag or not away_team_tag:
-            sys.stderr.write("⚠️ Could not find team names on match page.\n")
-            return []
-
-        home_team_name = home_team_tag.text.strip()
-        away_team_name = away_team_tag.text.strip()
-
-        # Step 5: Call your parse_player_grades() function with soup and team names
-        player_grades = parse_player_grades(soup, home_team_name, away_team_name)
-
-        return player_grades
-
 def find_team_standing(team_name, standings):
     normalized_team = normalize(team_name)
     # First try to resolve the normalized name to the official team name using your alias mapping
@@ -858,7 +749,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
         return []
     
     sys.stderr.write(f"DEBUG: URL fetched: {url}\n")
-    sys.stderr.write(f"DEBUG: Page snippet:\n{response.text[:1000]}\n")
+    sys.stderr.write(f"DEBUG: Page snippet:\n{response.text[:1000]}\n")  # print first 1000 chars
     
     soup = BeautifulSoup(response.text, "html.parser")
     table = soup.find("table", id="ctl00_cphMain_dgStats")
@@ -890,152 +781,14 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
             "value_text": value_text,
             "value_num": value_num
         })
-
-    # Sorting and top selection happens AFTER collecting all players
-    players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
-    top_players = []
+    
+        players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
+        top_players = []
 
     for p in players_sorted[:top_n]:
         top_players.append(f"{p['player']}, {p['position']}, {p['team']} - {p['value_text']}")
 
     return top_players
-
-def build_last_match_data_by_team(session, fixtures, standings, league_urls): 
-    last_match_data = {}
-    last_match_game_ids = {}
-
-    for match in fixtures:
-        for team in [match["home_team"], match["away_team"]]:
-            if team in last_match_data:
-                continue  # Skip if already processed
-
-            last_match = get_last_match_for_team(team, league_urls)
-            if not last_match:
-                continue
-
-            grades = get_player_grades_only(last_match["game_id"])
-            match_data = get_match_data_only(last_match["game_id"])
-            if not grades or not match_data:
-                continue
-
-            team_grades = [p["grade"] for p in grades if p["team"] == team and p["grade"] is not None]
-            if not team_grades:
-                continue
-
-            avg_rating = round(sum(team_grades) / len(team_grades), 2)
-
-            home = match_data["home_team"]
-            away = match_data["away_team"]
-            hs = int(match_data["home_score"])
-            as_ = int(match_data["away_score"])
-
-            # Goal difference from this team’s perspective
-            if normalize(team) == normalize(home):
-                goal_diff = hs - as_
-            elif normalize(team) == normalize(away):
-                goal_diff = as_ - hs
-            else:
-                continue  # Team not found in match (shouldn't happen)
-
-            # Match result
-            if goal_diff > 0:
-                result = "win"
-            elif goal_diff < 0:
-                result = "loss"
-            else:
-                result = "draw"
-
-            last_match_data[team] = {
-                "result": result,
-                "avg_rating": avg_rating,
-                "goal_diff": goal_diff
-            }
-            last_match_game_ids[team] = last_match["game_id"]
-
-    return last_match_data, last_match_game_ids
-
-def decimal_to_american(decimal_odds):
-    if decimal_odds >= 2.0:
-        return f"+{int(round((decimal_odds - 1) * 100))}"
-    else:
-        return f"{int(round(-100 / (decimal_odds - 1)))}"
-
-def generate_drafkzar_odds(fixtures, standings_data, last_match_data, last_match_game_ids):
-    odds_output = "DrafKzars™️ Odds for Upcoming Matches 💵🎲:\n\n"
-
-    for fixture in fixtures:
-        home = fixture["home_team"] if "home_team" in fixture else fixture.get("home")
-        away = fixture["away_team"] if "away_team" in fixture else fixture.get("away")
-
-        home_stats = standings_data.get(home)
-        away_stats = standings_data.get(away)
-
-        if not home_stats or not away_stats:
-            continue
-
-        # ✅ Step 1: Initialize base strength from standings
-        home_strength = home_stats["points"] + home_stats["diff"] * 0.1
-        away_strength = away_stats["points"] + away_stats["diff"] * 0.1
-
-        # ✅ Step 2: Boost from last match result
-        home_info = last_match_data.get(home, {})
-        away_info = last_match_data.get(away, {})
-
-        home_result = home_info.get("result")
-        away_result = away_info.get("result")
-
-        if home_result == "win":
-            home_strength += 2
-        elif home_result == "draw":
-            home_strength += 1
-
-        if away_result == "win":
-            away_strength += 2
-        elif away_result == "draw":
-            away_strength += 1
-
-        # ✅ Step 3: Boost from player grades
-        home_game_id = last_match_game_ids.get(home)
-        away_game_id = last_match_game_ids.get(away)
-
-        if home_game_id:
-            grades = get_player_grades_only(home_game_id)
-            valid = [p["grade"] for p in grades if p["grade"] is not None and p["team"] == home]
-            if valid:
-                home_avg_rating = sum(valid) / len(valid)
-                home_strength += home_avg_rating
-
-        if away_game_id:
-            grades = get_player_grades_only(away_game_id)
-            valid = [p["grade"] for p in grades if p["grade"] is not None and p["team"] == away]
-            if valid:
-                away_avg_rating = sum(valid) / len(valid)
-                away_strength += away_avg_rating
-
-        # ✅ Step 4: Calculate odds
-        total_strength = home_strength + away_strength
-        if total_strength == 0:
-            continue  # avoid division by zero
-
-        home_prob = home_strength / total_strength
-        away_prob = away_strength / total_strength
-
-        home_odds = round(1 / home_prob, 2)
-        away_odds = round(1 / away_prob, 2)
-
-        home_american = decimal_to_american(home_odds)
-        away_american = decimal_to_american(away_odds)
-
-        if home_odds < away_odds:
-            odds_line = f"{home} 🟩 ({home_american}) vs {away} 🟥 ({away_american})"
-        elif away_odds < home_odds:
-            odds_line = f"{home} 🟥 ({home_american}) vs {away} 🟩 ({away_american})"
-        else:
-            odds_line = f"{home} ⚪ ({home_american}) vs {away} ⚪ ({away_american})"
-
-        odds_output += odds_line + "\n"
-
-    return odds_output.strip()
 
 @app.route("/tv", methods=["POST"])
 def manual_tv_schedule():
@@ -1288,42 +1041,6 @@ def groupme_webhook():
                     message += f"{label}\n{players[0]}\n\n"
             send_groupme_message(message.strip())
             return "ok", 200
-
-    # 🟢 6. DraftKzars Odds
-    if any(bot_name in text_lower for bot_name in bot_aliases):
-        if any(kw in text_lower for kw in ["draftkzars odd", "odds", "betting"]):
-            sys.stderr.write("✅ Triggered DraftKzars Odds.\n")
-            send_groupme_message("Ay we got some degenerates talkin', I love it...")    
-    
-            session = get_logged_in_session()
-            if not session:
-                send_groupme_message("⚠️ Could not log in to Xpert Eleven to fetch odds.")
-                return "OK", 200
-    
-            goon_standings = scrape_league_standings_with_login(session, GOONDESLIGA_URL)
-            spoon_standings = scrape_league_standings_with_login(session, SPOONDESLIGA_URL)
-    
-            goon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, GOONDESLIGA_URL)
-            spoon_fixtures = scrape_upcoming_fixtures_from_standings_page(session, SPOONDESLIGA_URL)
-    
-            # === UNPACK BOTH VALUES FROM build_last_match_data_by_team ===
-            goon_last_match_data, goon_last_match_game_ids = build_last_match_data_by_team(session, goon_fixtures, goon_standings, [GOONDESLIGA_URL])
-            spoon_last_match_data, spoon_last_match_game_ids = build_last_match_data_by_team(session, spoon_fixtures, spoon_standings, [SPOONDESLIGA_URL])
-    
-            # === PASS BOTH last_match_data AND last_match_game_ids TO generate_drafkzar_odds ===
-            goon_odds_text = generate_drafkzar_odds(goon_fixtures, goon_standings, goon_last_match_data, goon_last_match_game_ids)
-            spoon_odds_text = generate_drafkzar_odds(spoon_fixtures, spoon_standings, spoon_last_match_data, spoon_last_match_game_ids)
-    
-            full_message = (
-                "DrafKzar™️ Goondesliga Odds 💵🎲\n\n"
-                + goon_odds_text
-                + "\n\n"
-                + "DrafKzar™️ Spoondesliga Odds 💵🎲\n\n"
-                + spoon_odds_text
-            )
-    
-            send_groupme_message(full_message[:1500])
-            return "OK", 200
     
     return "ok", 200
 
