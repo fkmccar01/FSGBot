@@ -740,7 +740,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
     sel = sel_map.get(category)
     if not sel:
         return []
-
+    
     url = f"https://www.xperteleven.com/stats.aspx?Lid={league_id}&Sel={sel}&Lnr={lnr}&Period=S&dh=2"
     response = session.get(url)
     if response.status_code != 200:
