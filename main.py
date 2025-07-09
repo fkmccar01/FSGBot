@@ -981,7 +981,7 @@ def groupme_webhook():
         if any(kw in text_lower for kw in ["golden boot", "goals", "top scorers", "assists", "points", "x11", "mvp", "league leaders"]):
             sys.stderr.write("✅ Triggered stat leaderboard command.\n")
             send_groupme_message("Yo these dudes ain't my 🐐 Dougie Maradonut but...")
-
+    
             session = get_logged_in_session()
             if not session:
                 send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
@@ -996,51 +996,40 @@ def groupme_webhook():
                 league_name = "Goondesliga"
                 league_id = 460905
                 lnr = 1
-
-        # Determine which stat category
-        if "golden boot" in text_lower or "goals" in text_lower or "top scorers" in text_lower:
-            category = "goals"
-            title = "Golden Boot 👟"
-        elif "assists" in text_lower:
-            category = "assists"
-            title = "Assists 🎩🪄"
-        elif "points" in text_lower:
-            category = "points"
-            title = "Points 💎"
-        elif "x11" in text_lower or "mvp" in text_lower:
-            category = "x11"
-            title = "MVP 🏅"
-        else:
-            category = None
-
-        if category:
-            top_players = scrape_league_stat_category(session, league_id, lnr, category, top_n=5)
-            if not top_players:
-                send_groupme_message(f"Couldn't fetch {title} leaderboard right now yo")
-                return "ok", 200
+    
+            # Determine which stat category
+            if "golden boot" in text_lower or "goals" in text_lower or "top scorers" in text_lower:
+                category = "goals"
+                title = "Golden Boot 👟"
+            elif "assists" in text_lower:
+                category = "assists"
+                title = "Assists 🎩🪄"
+            elif "points" in text_lower:
+                category = "points"
+                title = "Points 💎"
+            elif "x11" in text_lower or "mvp" in text_lower:
+                category = "x11"
+                title = "MVP 🏅"
             else:
-                message = f"{title} Leaders ({league_name}):\n\n"
-                for i, player in enumerate(top_players, 1):
-                    message += f"{i}. {player}\n"
-                send_groupme_message(message.strip())
-                return "ok", 200
-        else:
-            # General "league leaders" summary
+                category = None
+    
+            # If a specific stat category was requested
+            if category:
+                top_players = scrape_league_stat_category(session, league_id, lnr, category, top_n=5)
+                if not top_players:
+                    send_groupme_message(f"Couldn't fetch {title} leaderboard right now yo")
+                    return "ok", 200
+                else:
+                    message = f"{title} Leaders ({league_name}):\n\n"
+                    for i, player in enumerate(top_players, 1):
+                        message += f"{i}. {player}\n"
+                    send_groupme_message(message.strip())
+                    return "ok", 200
+    
+            # General "league leaders" summary if no specific category
             leaderboard = {
-                "Golden Boot 👟": scrape_league_stat_category(session, league_id, lnr, "goals", top_n=1),
-                "Assists 🎩🪄": scrape_league_stat_category(session, league_id, lnr, "assists", top_n=1),
-                "Points 💎": scrape_league_stat_category(session, league_id, lnr, "points", top_n=1),
-                "MVP 🏅": scrape_league_stat_category(session, league_id, lnr, "x11", top_n=1)
-            }
-
-            message = f"{league_name} Leaders:\n\n"
-            for label, players in leaderboard.items():
-                if players:
-                    message += f"{label}\n{players[0]}\n\n"
-            send_groupme_message(message.strip())
-            return "ok", 200
-
-    return "ok", 200
+    
+        return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
