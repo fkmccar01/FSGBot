@@ -761,7 +761,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
 
     for row in rows[1:]:  # skip header row
         cols = row.find_all("td")
-        if len(cols) < 6:
+        if len(cols) < 5:
             continue
         name = cols[1].get_text(strip=True)
         pos = cols[2].get_text(strip=True)
@@ -772,7 +772,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
         if not m:
             continue
         value_num = int(m.group(1))
-
+    
         players.append({
             "player": name,
             "position": pos,
@@ -780,9 +780,9 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
             "value_text": value_text,
             "value_num": value_num
         })
-
-    players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
-    top_players = []
+    
+        players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
+        top_players = []
 
     for p in players_sorted[:top_n]:
         top_players.append(f"{p['player']}, {p['position']}, {p['team']} - {p['value_text']}")
