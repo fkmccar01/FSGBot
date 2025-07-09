@@ -803,7 +803,7 @@ def build_last_match_data_by_team(session, fixtures, standings, league_urls):
             if not last_match:
                 continue
 
-            _, grades, match_data = get_match_summary_and_grades(session, last_match["game_id"])
+            _, grades, match_data = get_match_summary_and_grades(last_match["game_id"])
             if not grades or not match_data:
                 continue
 
