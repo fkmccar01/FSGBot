@@ -679,7 +679,7 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
 
     # Get last match details for home team
     if home_last_match:
-        summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(home_last_match["game_id"])
+        summary_home, player_grades_home_all, match_data_home = get_match_summary_and_grades(session, home_last_match["game_id"])
         team1_name = home_standings['team']
         team1_player_grades = filter_players_for_team(player_grades_home_all, team1_name)
         team1_last_match = {
@@ -689,7 +689,7 @@ def generate_match_preview(session, upcoming_match, goon_standings, spoon_standi
 
     # Get last match details for away team
     if away_last_match:
-        summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(away_last_match["game_id"])
+        summary_away, player_grades_away_all, match_data_away = get_match_summary_and_grades(session, away_last_match["game_id"])
         team2_name = away_standings['team']
         team2_player_grades = filter_players_for_team(player_grades_away_all, team2_name)
         team2_last_match = {
@@ -764,7 +764,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
 
     return top_players
 
-def build_last_match_data_by_team(fixtures, standings, league_urls):
+def build_last_match_data_by_team(session, fixtures, standings, league_urls):
     last_match_data = {}
 
     for match in fixtures:
@@ -776,7 +776,7 @@ def build_last_match_data_by_team(fixtures, standings, league_urls):
             if not last_match:
                 continue
 
-            _, grades, match_data = get_match_summary_and_grades(last_match["game_id"])
+            _, grades, match_data = get_match_summary_and_grades(session, last_match["game_id"])
             if not grades or not match_data:
                 continue
 
