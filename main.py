@@ -759,7 +759,7 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
     rows = table.find_all("tr")
     players = []
 
-    for row in rows[1:]:  # skip header row
+    for row in rows:
         cols = row.find_all("td")
         if len(cols) < 5:
             continue
