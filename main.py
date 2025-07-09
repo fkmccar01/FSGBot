@@ -782,31 +782,30 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
             "value_num": value_num
         })
     
-        players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
-        top_players = []
+    players_sorted = sorted(players, key=lambda x: x["value_num"], reverse=True)
+    top_players = []
 
     for p in players_sorted[:top_n]:
         top_players.append(f"{p['player']}, {p['position']}, {p['team']} - {p['value_text']}")
 
     return top_players
 
-# Generate odds text
-            goon_odds_text = generate_drafkzar_odds(goon_fixtures, goon_standings, goon_last_match_data)
-            spoon_odds_text = generate_drafkzar_odds(spoon_fixtures, spoon_standings, spoon_last_match_data)
-    
-            # Compose full message
-            full_message = (
-                "DrafKzar™️ Goondesliga Odds 💵🎲\n\n"
-                + goon_odds_text
-                + "\n\n"
-                + "DrafKzar™️ Spoondesliga Odds 💵🎲\n\n"
-                + spoon_odds_text
-            )
-    
-            send_groupme_message(full_message)
-            return "OK", 200
 
-    return "ok", 200
+# These lines are wrongly indented in your version — this is where they go:
+goon_odds_text = generate_drafkzar_odds(goon_fixtures, goon_standings, goon_last_match_data)
+spoon_odds_text = generate_drafkzar_odds(spoon_fixtures, spoon_standings, spoon_last_match_data)
+
+# Compose full message
+full_message = (
+    "DrafKzar™️ Goondesliga Odds 💵🎲\n\n"
+    + goon_odds_text
+    + "\n\n"
+    + "DrafKzar™️ Spoondesliga Odds 💵🎲\n\n"
+    + spoon_odds_text
+)
+
+send_groupme_message(full_message)
+return "OK", 200
 
 def build_last_match_data_by_team(session, fixtures, standings, league_urls):
     last_match_data = {}
