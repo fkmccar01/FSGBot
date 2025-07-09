@@ -917,8 +917,6 @@ def groupme_webhook():
     data = request.get_json()
     sys.stderr.write(f"Webhook data received: {data}\n")
 
-    session = requests.Session()
-
     if not data:
         return "No data received", 400
 
