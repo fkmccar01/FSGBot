@@ -1018,7 +1018,7 @@ def groupme_webhook():
                     send_groupme_message(f"Couldn't fetch {title} leaderboard right now yo")
                     return "ok", 200
                 else:
-                    message = f"*{title} Leaders ({league_name.title()}):*\n\n"
+                    message = f"**{title} Leaders ({league_name.title()}):**\n\n"
                     for i, player in enumerate(top_players, 1):
                         message += f"{i}. {player}\n"
                     send_groupme_message(message.strip())
@@ -1032,10 +1032,10 @@ def groupme_webhook():
                     "MVP 🏅": scrape_league_stat_category(session, league_id, "x11", top_n=1)
                 }
     
-                message = f"*{league_name.title()} Leaders:*\n\n"
+                message = f"**{league_name.title()} Leaders:**\n\n"
                 for label, players in leaderboard.items():
                     if players:
-                        message += f"{label}: {players[0]}\n"
+                        message += f"{label}\n{players[0]}\n\n"
                 send_groupme_message(message.strip())
                 return "ok", 200
 
