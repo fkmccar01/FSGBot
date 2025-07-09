@@ -982,20 +982,20 @@ def groupme_webhook():
             sys.stderr.write("✅ Triggered stat leaderboard command.\n")
             send_groupme_message("Yo these dudes ain't my 🐐 Dougie Maradonut but...")
 
-        session = get_logged_in_session()
-        if not session:
-            send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
-            return "ok", 200
-
-        # Determine league and Lnr
-        if "spoon" in text_lower:
-            league_name = "Spoondesliga"
-            league_id = 460905
-            lnr = 2
-        else:
-            league_name = "Goondesliga"
-            league_id = 460905
-            lnr = 1
+            session = get_logged_in_session()
+            if not session:
+                send_groupme_message("⚠️ I couldn't log in to Xpert Eleven.")
+                return "ok", 200
+    
+            # Determine league and Lnr
+            if "spoon" in text_lower:
+                league_name = "Spoondesliga"
+                league_id = 460905
+                lnr = 2
+            else:
+                league_name = "Goondesliga"
+                league_id = 460905
+                lnr = 1
 
         # Determine which stat category
         if "golden boot" in text_lower or "goals" in text_lower or "top scorers" in text_lower:
