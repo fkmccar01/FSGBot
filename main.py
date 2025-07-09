@@ -746,11 +746,14 @@ def scrape_league_stat_category(session, league_id, lnr, category, top_n=5):
     if response.status_code != 200:
         sys.stderr.write(f"⚠️ Failed to fetch {category} stats: {response.status_code}\n")
         return []
-
+    
+    sys.stderr.write(f"DEBUG: URL fetched: {url}\n")
+    sys.stderr.write(f"DEBUG: Page snippet:\n{response.text[:1000]}\n")  # print first 1000 chars
+    
     soup = BeautifulSoup(response.text, "html.parser")
     table = soup.find("table", id="ctl00_cphMain_dgStats")
     if not table:
-        sys.stderr.write(f"⚠️ Could not find stats table for category: {category}\n")
+        sys.stderr.write(f"⚠️ Could not find stats table for category: {category} at Lnr={lnr}\n")
         return []
 
     rows = table.find_all("tr")
