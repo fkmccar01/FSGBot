@@ -1028,8 +1028,20 @@ def groupme_webhook():
     
             # General "league leaders" summary if no specific category
             leaderboard = {
+                "Golden Boot 👟": scrape_league_stat_category(session, league_id, lnr, "goals", top_n=1),
+                "Assists 🎩🪄": scrape_league_stat_category(session, league_id, lnr, "assists", top_n=1),
+                "Points 💎": scrape_league_stat_category(session, league_id, lnr, "points", top_n=1),
+                "MVP 🏅": scrape_league_stat_category(session, league_id, lnr, "x11", top_n=1)
+            }
+
+            message = f"{league_name} Leaders:\n\n"
+            for label, players in leaderboard.items():
+                if players:
+                    message += f"{label}\n{players[0]}\n\n"
+            send_groupme_message(message.strip())
+            return "ok", 200
     
-        return "ok", 200
+    return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
