@@ -756,7 +756,7 @@ def scrape_league_stat_category(session, league_id, category, top_n=5):
         sys.stderr.write(f"⚠️ Could not find stats table for category: {category}\n")
         return []
 
-    rows = table.find_all("tr")[1:]  # skip header
+    rows = table.find_all("tr")
 
     players = []
 
