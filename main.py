@@ -383,6 +383,62 @@ def scrape_and_summarize_by_game_id(game_id):
         prompt = format_gemini_prompt(match_data, events, player_grades)
         return call_gemini_api(prompt)
 
+def get_match_data_only(game_id):
+    login_url = "https://www.xperteleven.com/front_new3.aspx"
+    match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
+
+    with requests.Session() as session:
+        # Load login page for hidden fields
+        login_page = session.get(login_url)
+        login_soup = BeautifulSoup(login_page.text, "html.parser")
+        try:
+            viewstate = login_soup.find("input", {"id": "__VIEWSTATE"})["value"]
+            viewstategen = login_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+            eventvalidation = login_soup.find("input", {"id": "__EVENTVALIDATION"})["value"]
+        except Exception:
+            sys.stderr.write("⚠️ Could not find login form hidden fields.\n")
+            return None
+
+        # Login payload
+        login_payload = {
+            "__VIEWSTATE": viewstate,
+            "__VIEWSTATEGENERATOR": viewstategen,
+            "__EVENTVALIDATION": eventvalidation,
+            "ctl00$cphMain$FrontControl$lwLogin$tbUsername": X11_USERNAME,
+            "ctl00$cphMain$FrontControl$lwLogin$tbPassword": X11_PASSWORD,
+            "ctl00$cphMain$FrontControl$lwLogin$btnLogin": "Login"
+        }
+        login_response = session.post(login_url, data=login_payload)
+        if "Logout" not in login_response.text:
+            sys.stderr.write("⚠️ Login failed.\n")
+            return None
+
+        # Fetch match page
+        match_response = session.get(match_url)
+        if match_response.status_code != 200:
+            sys.stderr.write(f"⚠️ Failed to retrieve match page: {match_response.status_code}\n")
+            return None
+
+        soup = BeautifulSoup(match_response.text, "html.parser")
+
+        home_team_tag = soup.find(id="ctl00_cphMain_lblHomeTeam")
+        away_team_tag = soup.find(id="ctl00_cphMain_lblAwayTeam")
+        home_score_tag = soup.find(id="ctl00_cphMain_lblHomeScore")
+        away_score_tag = soup.find(id="ctl00_cphMain_lblAwayScore")
+
+        if not all([home_team_tag, away_team_tag, home_score_tag, away_score_tag]):
+            sys.stderr.write("⚠️ Could not find all match info on page.\n")
+            return None
+
+        match_data = {
+            "home_team": home_team_tag.text.strip(),
+            "away_team": away_team_tag.text.strip(),
+            "home_score": int(home_score_tag.text.strip()),
+            "away_score": int(away_score_tag.text.strip()),
+        }
+
+        return match_data
+
 def get_match_summary_and_grades(game_id):
     login_url = "https://www.xperteleven.com/front_new3.aspx"
     match_url = f"https://www.xperteleven.com/gameDetails.aspx?GameID={game_id}&dh=2"
@@ -857,7 +913,8 @@ def build_last_match_data_by_team(session, fixtures, standings, league_urls):
             if not last_match:
                 continue
 
-            _, grades, match_data = get_player_grades_only(game_id)
+            grades = get_player_grades_only(last_match["game_id"])
+            match_data = get_match_data_only(last_match["game_id"])
             if not grades or not match_data:
                 continue
 
@@ -893,7 +950,7 @@ def build_last_match_data_by_team(session, fixtures, standings, league_urls):
                 "avg_rating": avg_rating,
                 "goal_diff": goal_diff
             }
-            last_match_game_ids[team] = last_match["game_id"]  # ✅ Save game_id
+            last_match_game_ids[team] = last_match["game_id"]
 
     return last_match_data, last_match_game_ids
 
